@@ -1,0 +1,7 @@
+game = { "Game" ~ #game_number = int ~ ":" ~ reveal ~ (";" ~ reveal)* }
+	int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+    reveal = { cubeCount ~ ("," ~ cubeCount)* }
+    cubeCount = { int ~ color }
+    color = { "red" | "green" | "blue" }
+
+WHITESPACE = _{ " " }
