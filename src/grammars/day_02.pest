@@ -1,7 +1,12 @@
+// Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+
+input = _{ game ~ ("\n" ~ game)* }
+
 game = { "Game" ~ #game_number = int ~ ":" ~ reveal ~ (";" ~ reveal)* }
-	int = { ("+" | "-")? ~ ASCII_DIGIT+ }
     reveal = { cubeCount ~ ("," ~ cubeCount)* }
     cubeCount = { int ~ color }
     color = { "red" | "green" | "blue" }
+
+int = @{ ASCII_DIGIT+ }
 
 WHITESPACE = _{ " " }
