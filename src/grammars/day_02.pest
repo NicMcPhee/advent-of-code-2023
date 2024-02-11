@@ -5,7 +5,10 @@ input = { game ~ ("\n" ~ game)* }
 game = { "Game" ~ #game_number = int ~ ":" ~ reveal ~ (";" ~ reveal)* }
     reveal = { cubeCount ~ ("," ~ cubeCount)* }
     cubeCount = { int ~ color }
-    color = { "red" | "green" | "blue" }
+    color = { red | green | blue }
+    red = { "red" }
+    green = { "green" }
+    blue = { "blue" }
 
 int = @{ ASCII_DIGIT+ }
 
