@@ -127,14 +127,14 @@ mod tests {
 
     #[test]
     fn check_test_input() {
-        let input = include_str!("../inputs/day_02_test.txt");
+        let input = include_str!("../inputs/day_02_test.txt").trim();
         let result = sum_of_legal_game_ids(input).unwrap();
         assert_eq!(result, 8);
     }
 
     #[test]
     fn check_full_input() {
-        let input = include_str!("../inputs/day_02.txt");
+        let input = include_str!("../inputs/day_02.txt").trim();
         let result = sum_of_legal_game_ids(input).unwrap();
         assert_eq!(result, 2285);
     }
