@@ -1,6 +1,13 @@
-use pest_consume::{match_nodes, Error, Parser};
+use nom::{
+    bytes::complete::tag,
+    character::complete::{newline, space1, u32},
+    combinator::all_consuming,
+    multi::separated_list1,
+    sequence::separated_pair,
+    IResult,
+};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Color {
     Red,
     Green,
@@ -44,60 +51,47 @@ struct Game {
     reveals: Vec<Reveal>,
 }
 
-#[derive(Parser)]
-#[grammar = "grammars/day_02.pest"]
-struct GameParser;
+fn parse_color(input: &str) -> IResult<&str, Color> {
+    nom::branch::alt((
+        nom::combinator::value(Color::Red, tag("red")),
+        nom::combinator::value(Color::Green, tag("green")),
+        nom::combinator::value(Color::Blue, tag("blue")),
+    ))(input)
+}
 
-type Result<T> = std::result::Result<T, Error<Rule>>;
-type Node<'i> = pest_consume::Node<'i, Rule, ()>;
+fn parse_cube_count(input: &str) -> IResult<&str, CubeCount> {
+    separated_pair(u32, space1, parse_color)(input)
+}
 
-#[pest_consume::parser]
-impl GameParser {
-    fn input(input: Node) -> Result<Vec<Game>> {
-        Ok(match_nodes!(input.into_children();
-            [game(g)..] => g.collect(),
-        ))
-    }
+fn parse_reveal(input: &str) -> IResult<&str, Reveal> {
+    separated_list1(tag(", "), parse_cube_count)(input).map(|(input, counts)| {
+        let reveal = counts.into_iter().collect();
+        (input, reveal)
+    })
+}
 
-    fn game(input: Node) -> Result<Game> {
-        Ok(match_nodes!(input.into_children();
-            [int(n), reveal(r)..] => Game { number: n, reveals: r.collect() },
-        ))
-    }
+fn parse_reveals(input: &str) -> IResult<&str, Vec<Reveal>> {
+    separated_list1(tag("; "), parse_reveal)(input)
+}
 
-    fn int(input: Node) -> Result<u32> {
-        Ok(input.as_str().parse().unwrap())
-    }
+fn parse_game_header(input: &str) -> IResult<&str, u32> {
+    separated_pair(tag("Game"), space1, u32)(input).map(|(input, (_, number))| (input, number))
+}
 
-    fn reveal(input: Node) -> Result<Reveal> {
-        Ok(match_nodes!(input.into_children();
-            [cubeCount(c)..] => c.collect::<Reveal>(),
-        ))
-    }
+fn parse_game(input: &str) -> IResult<&str, Game> {
+    let (input, (game_number, reveals)) =
+        nom::sequence::separated_pair(parse_game_header, tag(": "), parse_reveals)(input)?;
+    Ok((
+        input,
+        Game {
+            number: game_number,
+            reveals,
+        },
+    ))
+}
 
-    fn cubeCount(input: Node) -> Result<CubeCount> {
-        Ok(match_nodes!(input.into_children();
-            [int(n), color(c)] => (n, c),
-        ))
-    }
-
-    fn color(input: Node) -> Result<Color> {
-        Ok(match_nodes!(input.into_children();
-            [red(c)] => c, [green(c)] => c, [blue(c)] => c,
-        ))
-    }
-
-    fn red(input: Node) -> Result<Color> {
-        Ok(Color::Red)
-    }
-
-    fn green(input: Node) -> Result<Color> {
-        Ok(Color::Green)
-    }
-
-    fn blue(input: Node) -> Result<Color> {
-        Ok(Color::Blue)
-    }
+fn parse_games(input: &str) -> IResult<&str, Vec<Game>> {
+    separated_list1(newline, parse_game)(input)
 }
 
 fn sum_of_legal_game_ids(input: &str) -> anyhow::Result<u32> {
@@ -106,9 +100,8 @@ fn sum_of_legal_game_ids(input: &str) -> anyhow::Result<u32> {
         green: 13,
         blue: 14,
     };
-    let games = GameParser::parse(Rule::input, input).unwrap();
-    let games = games.single()?;
-    let games = GameParser::input(games)?;
+    let (_, games) =
+        all_consuming(parse_games)(input).map_err(nom::Err::<nom::error::Error<&str>>::to_owned)?;
     Ok(games
         .into_iter()
         .filter_map(|game| {
@@ -121,7 +114,7 @@ fn sum_of_legal_game_ids(input: &str) -> anyhow::Result<u32> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let input = include_str!("../inputs/day_02.txt");
+    let input = include_str!("../inputs/day_02.txt").trim();
     let result = sum_of_legal_game_ids(input);
     println!("Result: {}", result?);
 
