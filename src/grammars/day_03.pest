@@ -1,0 +1,11 @@
+input = _{ row ~ ("\n" ~ row)* }
+
+row = { cell* }
+
+cell = { number | symbol }
+
+number = @{ ASCII_DIGIT+ }
+
+symbol = { !(WHITESPACE | number) ~ ANY }
+
+WHITESPACE = _{ "." }
