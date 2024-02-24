@@ -10,6 +10,7 @@ This was started on Saturday, 3 February 2024.
   - [Part 1](#part-1)
   - [Part 2](#part-2)
 - [Day 02](#day-02)
+- [Day 03](#day-03)
 
 ---
 
@@ -39,11 +40,11 @@ was clean enough that I really just had extract out and modify a
 I spent a while flailing on how to get the consecutive "windows" onto
 a given `line` as it turned out that there wasn't a particularly good
 "built-in" for that. In the end I went with a suggestion from
-@JustusFleugel to use `char_indices` to get all the consecutive slices.
+@JustusFluegel to use `char_indices` to get all the consecutive slices.
 Then we just used `filter_map()` again with a new `to_digits()` method.
 
 Using `match` on `to_digits()` was quite nice, and cleaner than I had
-anticipated. I used `s.starts_with()` as suggested by @JustusFleugel, but @MizardX proposed matching against byte arrays, like:
+anticipated. I used `s.starts_with()` as suggested by @JustusFluegel, but @MizardX proposed matching against byte arrays, like:
 
 ```rust
     match s.as_bytes() {
@@ -112,3 +113,50 @@ some downsides:
 
 I haven't yet processed the value returned by the parser, though,
 so it might be less of an issue than I'm thinking.
+
+## Day 03
+
+I decided that I liked Pest, so I chose to use it again for Day 03.
+
+We started with this Pest grammar:
+
+```pest
+input = _{ row ~ ("\n" ~ row)* }
+
+row = { cell* }
+
+cell = { number | symbol }
+
+number = @{ ASCII_DIGIT+ }
+
+symbol = { !(WHITESPACE | number) ~ ANY }
+
+WHITESPACE = _{ "." }
+```
+
+but ended up changing to:
+
+```pest
+input = { WHITESPACE* ~ cell+ }
+
+cell = { number | symbol }
+
+number = @{ ASCII_DIGIT+ }
+
+symbol = { !(WHITESPACE | ASCII_DIGIT) ~ ANY }
+
+WHITESPACE = _{ "." | NEWLINE}
+```
+
+We had some trailing newlines (thanks to @MizardX for noticing that), so we added them to `WHITESPACE`. That then allowed us to just remove the `row` item from the grammar. When we went from the test input to the entire input, we found that it starts with a bunch of dots (whitespace), so the parser failed to find anything. since `cell*` and `cell+` only have whitespace _between_ elements. So we had to add `WHITESPACE*` to the front of the `input`.
+
+Pest's span fields were great here, and made it easy to keep track of where things were in the input. We were able to fairly easily parse a part to a `Part` `struct` with the value of the part number, the line it was one, and the start and end positions of the digit sequence for that part. Similarly, a `Symbol` could have the character, and its line and column.
+
+We came up (with lots of help from @JustusFluegel and @MizardX ) with a nice iterator over the adjacent locations of a `Part`, using `chain` in nice ways. We could then check each of those to see if it had a `Symbol` at that location. There was some discussion about whether we should loop over `Parts` and look up `Symbols`, or loop over `Symbols` and just do math related to the `Parts`. We went with the former (partly because hashing made looking up symbols by position easy and fast), but now that we've seen Part 2 of Day 03, I'm thinking we should have done the latter since now we'll need to loop over `Symbols` for this part. Oh, well.
+
+I had thought we'd have to worry about subtractions going negative when we computed
+the positions around a part, but since Pest starts its line and column counting at 1
+instead of 0, it's safe to subtract one from those even though they are unsigned values.
+When I still thought we'd have to worry about that problem, @MizardX suggested
+`saturated_sub()` (which I've never used), which totally would have been perfect
+if we had in fact needed it.
