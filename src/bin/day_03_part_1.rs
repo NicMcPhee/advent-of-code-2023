@@ -1,129 +1,142 @@
+use std::collections::HashMap;
+
 use pest_consume::{match_nodes, Error, Parser};
 
 #[derive(Debug)]
-enum Color {
-    Red,
-    Green,
-    Blue,
+struct Part {
+    number: u32,
+    line: usize,
+    start: usize,
+    end: usize,
 }
 
-#[derive(Debug)]
-struct Reveal {
-    red: u32,
-    green: u32,
-    blue: u32,
-}
-
-impl Reveal {
-    fn within(&self, max_count: &Reveal) -> bool {
-        self.red <= max_count.red && self.green <= max_count.green && self.blue <= max_count.blue
+impl Part {
+    fn adjacent_fields(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        // The set of positions above the given `Part`, and extending one to the left and right for
+        // diagonal positions.
+        let top_line = ((self.start - 1)..=self.end).map(|column| (self.line - 1, column));
+        // The set of positions below the given `Part`, and extending one to the left and right for
+        // diagonal positions.
+        let bottom_line = ((self.start - 1)..=self.end).map(|column| (self.line + 1, column));
+        // The set of positions to the left and right of the given `Part`.
+        [(self.line, self.start - 1), (self.line, self.end)]
+            .into_iter()
+            .chain(top_line)
+            .chain(bottom_line)
     }
 }
 
-type CubeCount = (u32, Color);
+#[derive(Debug)]
+struct Symbol {
+    symbol: char,
+    line: usize,
+    column: usize,
+}
 
-impl FromIterator<CubeCount> for Reveal {
-    fn from_iter<I: IntoIterator<Item = CubeCount>>(iter: I) -> Self {
-        let mut red = 0;
-        let mut green = 0;
-        let mut blue = 0;
-        for (count, color) in iter {
-            match color {
-                Color::Red => red += count,
-                Color::Green => green += count,
-                Color::Blue => blue += count,
+#[derive(Debug)]
+enum Cell {
+    Part(Part),
+    Symbol(Symbol),
+}
+
+#[derive(Debug)]
+struct Schematic {
+    parts: Vec<Part>,
+    symbols: HashMap<(usize, usize), char>,
+}
+
+impl Schematic {
+    fn sum_of_part_numbers(&self) -> u32 {
+        self.parts
+            .iter()
+            .filter(|part| self.has_adjacent_symbol(part))
+            .map(|part| part.number)
+            .sum()
+    }
+
+    fn has_adjacent_symbol(&self, part: &Part) -> bool {
+        part.adjacent_fields()
+            .any(|(line, column)| self.symbol_at_position(line, column))
+    }
+
+    fn symbol_at_position(&self, line: usize, column: usize) -> bool {
+        self.symbols.contains_key(&(line, column))
+    }
+}
+
+impl FromIterator<Cell> for Schematic {
+    fn from_iter<I: IntoIterator<Item = Cell>>(iter: I) -> Self {
+        let mut parts = Vec::new();
+        let mut symbols = HashMap::new();
+        for cell in iter {
+            match cell {
+                Cell::Part(part) => parts.push(part),
+                Cell::Symbol(symbol) => {
+                    symbols.insert((symbol.line, symbol.column), symbol.symbol);
+                }
             }
         }
-        Reveal { red, green, blue }
+        Schematic { parts, symbols }
     }
-}
-
-#[derive(Debug)]
-struct Game {
-    number: u32,
-    reveals: Vec<Reveal>,
 }
 
 #[derive(Parser)]
-#[grammar = "grammars/day_02.pest"]
-struct GameParser;
+#[grammar = "grammars/day_03.pest"]
+struct SchematicParser;
 
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
 #[pest_consume::parser]
-impl GameParser {
-    fn input(input: Node) -> Result<Vec<Game>> {
+impl SchematicParser {
+    fn input(input: Node) -> Result<Schematic> {
         Ok(match_nodes!(input.into_children();
-            [game(g)..] => g.collect(),
+            [cell(se)..] => se.collect::<Schematic>(),
         ))
     }
 
-    fn game(input: Node) -> Result<Game> {
+    fn cell(input: Node) -> Result<Cell> {
         Ok(match_nodes!(input.into_children();
-            [int(n), reveal(r)..] => Game { number: n, reveals: r.collect() },
+            [number(p)] => Cell::Part(p),
+            [symbol(s)] => Cell::Symbol(s),
         ))
     }
 
-    fn int(input: Node) -> Result<u32> {
-        Ok(input.as_str().parse().unwrap())
+    fn number(input: Node) -> Result<Part> {
+        let number = input.as_str().parse().unwrap();
+        let span = input.as_span();
+        let (line, start) = span.start_pos().line_col();
+        let (_, end) = span.end_pos().line_col();
+        Ok(Part {
+            number,
+            line,
+            start,
+            end,
+        })
     }
 
-    fn reveal(input: Node) -> Result<Reveal> {
-        Ok(match_nodes!(input.into_children();
-            [cubeCount(c)..] => c.collect::<Reveal>(),
-        ))
-    }
-
-    fn cubeCount(input: Node) -> Result<CubeCount> {
-        Ok(match_nodes!(input.into_children();
-            [int(n), color(c)] => (n, c),
-        ))
-    }
-
-    fn color(input: Node) -> Result<Color> {
-        Ok(match_nodes!(input.into_children();
-            [red(c)] => c, [green(c)] => c, [blue(c)] => c,
-        ))
-    }
-
-    fn red(input: Node) -> Result<Color> {
-        Ok(Color::Red)
-    }
-
-    fn green(input: Node) -> Result<Color> {
-        Ok(Color::Green)
-    }
-
-    fn blue(input: Node) -> Result<Color> {
-        Ok(Color::Blue)
+    fn symbol(input: Node) -> Result<Symbol> {
+        let symbol = input.as_str().chars().next().unwrap();
+        let span = input.as_span();
+        let (line, column) = span.start_pos().line_col();
+        Ok(Symbol {
+            symbol,
+            line,
+            column,
+        })
     }
 }
 
-fn sum_of_legal_game_ids(input: &str) -> anyhow::Result<u32> {
-    let max_count = Reveal {
-        red: 12,
-        green: 13,
-        blue: 14,
-    };
-    let games = GameParser::parse(Rule::input, input).unwrap();
-    let games = games.single()?;
-    let games = GameParser::input(games)?;
-    Ok(games
-        .into_iter()
-        .filter_map(|game| {
-            game.reveals
-                .iter()
-                .all(|reveal| reveal.within(&max_count))
-                .then_some(game.number)
-        })
-        .sum())
+fn parse_schematic(input: &str) -> anyhow::Result<Schematic> {
+    let parts = SchematicParser::parse(Rule::input, input)?;
+    let parts = parts.single()?;
+    SchematicParser::input(parts).map_err(Into::into)
 }
 
 fn main() -> anyhow::Result<()> {
-    let input = include_str!("../inputs/day_02.txt");
-    let result = sum_of_legal_game_ids(input);
-    println!("Result: {}", result?);
+    let input = include_str!("../inputs/day_03.txt");
+    let result = parse_schematic(input)?.sum_of_part_numbers();
+    println!("Result: {}", result);
 
     Ok(())
 }
@@ -134,15 +147,15 @@ mod tests {
 
     #[test]
     fn check_test_input() {
-        let input = include_str!("../inputs/day_02_test.txt");
-        let result = sum_of_legal_game_ids(input).unwrap();
-        assert_eq!(result, 8);
+        let input = include_str!("../inputs/day_03_test.txt");
+        let result = parse_schematic(input).unwrap().sum_of_part_numbers();
+        assert_eq!(result, 4361);
     }
 
     #[test]
     fn check_full_input() {
-        let input = include_str!("../inputs/day_02.txt");
-        let result = sum_of_legal_game_ids(input).unwrap();
-        assert_eq!(result, 2285);
+        let input = include_str!("../inputs/day_03.txt");
+        let result = parse_schematic(input).unwrap().sum_of_part_numbers();
+        assert_eq!(result, 498559);
     }
 }
