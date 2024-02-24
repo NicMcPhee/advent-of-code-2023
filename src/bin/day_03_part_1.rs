@@ -91,7 +91,7 @@ type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 impl SchematicParser {
     fn input(input: Node) -> Result<Schematic> {
         Ok(match_nodes!(input.into_children();
-            [cell(se)..] => se.collect::<Schematic>(),
+            [cell(c)..] => c.collect::<Schematic>(),
         ))
     }
 
@@ -103,7 +103,10 @@ impl SchematicParser {
     }
 
     fn number(input: Node) -> Result<Part> {
-        let number = input.as_str().parse().unwrap();
+        let number = input
+            .as_str()
+            .parse()
+            .expect("A part number must be a valid unsigned integer.");
         let span = input.as_span();
         let (line, start) = span.start_pos().line_col();
         let (_, end) = span.end_pos().line_col();
@@ -116,7 +119,11 @@ impl SchematicParser {
     }
 
     fn symbol(input: Node) -> Result<Symbol> {
-        let symbol = input.as_str().chars().next().unwrap();
+        let symbol = input
+            .as_str()
+            .chars()
+            .next()
+            .expect("A symbol must be a single character.");
         let span = input.as_span();
         let (line, column) = span.start_pos().line_col();
         Ok(Symbol {
