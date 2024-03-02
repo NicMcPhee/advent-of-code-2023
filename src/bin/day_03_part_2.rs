@@ -1,8 +1,33 @@
+use itertools::Itertools;
+use pest_consume::{match_nodes, Error, Parser};
 use std::collections::HashMap;
 
-use pest_consume::{match_nodes, Error, Parser};
+trait NextTwo
+where
+    Self: Iterator,
+{
+    fn next_two(self) -> Option<(Self::Item, Self::Item)>;
+}
 
-#[derive(Debug)]
+impl<T> NextTwo for T
+where
+    T: Iterator,
+{
+    fn next_two(mut self) -> Option<(Self::Item, Self::Item)> {
+        let first = self.next()?;
+        let second = self.next()?;
+
+        if self.next().is_some() {
+            return None;
+        }
+
+        Some((first, second))
+    }
+}
+
+type Location = (usize, usize);
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 struct Part {
     number: u32,
     line: usize,
@@ -10,16 +35,24 @@ struct Part {
     end: usize,
 }
 
-impl Part {
-    fn adjacent_fields(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        // The set of positions above the given `Part`, and extending one to the left and right for
+#[derive(Debug)]
+struct Gear {
+    line: usize,
+    column: usize,
+}
+
+impl Gear {
+    fn adjacent_fields(&self) -> impl Iterator<Item = Location> + '_ {
+        // The set of positions above the given `Gear`, and extending one to the left and right for
         // diagonal positions.
-        let top_line = ((self.start - 1)..=self.end).map(|column| (self.line - 1, column));
-        // The set of positions below the given `Part`, and extending one to the left and right for
+        let top_line =
+            ((self.column - 1)..=(self.column + 1)).map(|column| (self.line - 1, column));
+        // The set of positions below the given `Gear`, and extending one to the left and right for
         // diagonal positions.
-        let bottom_line = ((self.start - 1)..=self.end).map(|column| (self.line + 1, column));
-        // The set of positions to the left and right of the given `Part`.
-        [(self.line, self.start - 1), (self.line, self.end)]
+        let bottom_line =
+            ((self.column - 1)..=(self.column + 1)).map(|column| (self.line + 1, column));
+        // The set of positions to the left and right of the given `Gear`.
+        [(self.line, self.column - 1), (self.line, self.column + 1)]
             .into_iter()
             .chain(top_line)
             .chain(bottom_line)
@@ -27,62 +60,51 @@ impl Part {
 }
 
 #[derive(Debug)]
-struct Symbol {
-    symbol: char,
-    line: usize,
-    column: usize,
-}
-
-#[derive(Debug)]
 enum Cell {
     Part(Part),
-    Symbol(Symbol),
+    Gear(Gear),
 }
 
 #[derive(Debug)]
 struct Schematic {
-    parts: Vec<Part>,
-    symbols: HashMap<(usize, usize), char>,
+    parts: HashMap<Location, Part>,
+    gears: Vec<Gear>,
 }
 
 impl Schematic {
     fn sum_of_gear_ratios(&self) -> u32 {
-        todo!()
-        // self.parts
-        //     .iter()
-        //     .filter(|part| self.has_adjacent_symbol(part))
-        //     .map(|part| part.number)
-        //     .sum()
+        self.gears.iter().flat_map(|gear| self.ratio(gear)).sum()
     }
 
-    fn has_adjacent_symbol(&self, part: &Part) -> bool {
-        part.adjacent_fields()
-            .any(|(line, column)| self.symbol_at_position(line, column))
-    }
-
-    fn symbol_at_position(&self, line: usize, column: usize) -> bool {
-        self.symbols.contains_key(&(line, column))
+    fn ratio(&self, gear: &Gear) -> Option<u32> {
+        gear.adjacent_fields()
+            .flat_map(|location| self.parts.get(&location))
+            .unique()
+            .map(|part| part.number)
+            .next_two()
+            .map(|(a, b)| a * b)
     }
 }
 
 impl FromIterator<Cell> for Schematic {
     fn from_iter<I: IntoIterator<Item = Cell>>(iter: I) -> Self {
-        let mut parts = Vec::new();
-        let mut symbols = HashMap::new();
+        let mut parts = HashMap::new();
+        let mut gears = Vec::new();
         for cell in iter {
             match cell {
-                Cell::Part(part) => parts.push(part),
-                Cell::Symbol(symbol) => {
-                    symbols.insert((symbol.line, symbol.column), symbol.symbol);
+                Cell::Part(part) => {
+                    parts.insert((part.line, part.start), part);
+                    parts.insert((part.line, part.end - 1), part);
                 }
+                Cell::Gear(gear) => gears.push(gear),
             }
         }
-        Schematic { parts, symbols }
+        Schematic { parts, gears }
     }
 }
 
 #[derive(Parser)]
-#[grammar = "grammars/day_03.pest"]
+#[grammar = "grammars/day_03_part_2.pest"]
 struct SchematicParser;
 
 type Result<T> = std::result::Result<T, Error<Rule>>;
@@ -99,7 +121,7 @@ impl SchematicParser {
     fn cell(input: Node) -> Result<Cell> {
         Ok(match_nodes!(input.into_children();
             [number(p)] => Cell::Part(p),
-            [symbol(s)] => Cell::Symbol(s),
+            [asterisk(g)] => Cell::Gear(g),
         ))
     }
 
@@ -119,19 +141,10 @@ impl SchematicParser {
         })
     }
 
-    fn symbol(input: Node) -> Result<Symbol> {
-        let symbol = input
-            .as_str()
-            .chars()
-            .next()
-            .expect("A symbol must be a single character.");
+    fn asterisk(input: Node) -> Result<Gear> {
         let span = input.as_span();
         let (line, column) = span.start_pos().line_col();
-        Ok(Symbol {
-            symbol,
-            line,
-            column,
-        })
+        Ok(Gear { line, column })
     }
 }
 
@@ -164,6 +177,6 @@ mod tests {
     fn check_full_input() {
         let input = include_str!("../inputs/day_03.txt");
         let result = parse_schematic(input).unwrap().sum_of_gear_ratios();
-        assert_eq!(result, 498559);
+        assert_eq!(result, 72246648);
     }
 }
