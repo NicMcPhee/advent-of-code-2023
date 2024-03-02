@@ -1,0 +1,9 @@
+input = { WHITESPACE* ~ cell+ }
+
+cell = { number | asterisk }
+
+number = @{ ASCII_DIGIT+ }
+
+asterisk = { "*" }
+
+WHITESPACE = _{ !(ASCII_DIGIT | "*") ~ ANY }
