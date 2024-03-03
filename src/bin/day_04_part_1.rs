@@ -3,13 +3,22 @@ use pest_consume::{match_nodes, Error, Parser};
 #[derive(Debug)]
 struct ScratchCard {
     // TODO: Convert these to `HashSet` so I can use `intersection` to determine the winning cards easily
+    // Alternatively, we could use the `bit-set` crate, which gives
+    // use the `BitSet` type, which would work fine here. That would
+    // certainly use less storage and probably(?) be faster.
     winning_numbers: Vec<u8>,
     our_numbers: Vec<u8>,
 }
 
 impl ScratchCard {
+    fn parse_scratchcards(input: &str) -> anyhow::Result<Vec<Self>> {
+        let parts = ScratchCardsParser::parse(Rule::input, input)?;
+        let parts = parts.single()?;
+        ScratchCardsParser::input(parts).map_err(Into::into)
+    }
+
     fn sum_of_values(input: &str) -> anyhow::Result<u32> {
-        Ok(parse_scratchcards(input)?
+        Ok(Self::parse_scratchcards(input)?
             .iter()
             .map(ScratchCard::value)
             .sum::<u32>())
@@ -57,12 +66,6 @@ impl ScratchCardsParser {
             .expect("A part number must be a valid unsigned integer.");
         Ok(number)
     }
-}
-
-fn parse_scratchcards(input: &str) -> anyhow::Result<Vec<ScratchCard>> {
-    let parts = ScratchCardsParser::parse(Rule::input, input)?;
-    let parts = parts.single()?;
-    ScratchCardsParser::input(parts).map_err(Into::into)
 }
 
 fn main() -> anyhow::Result<()> {
