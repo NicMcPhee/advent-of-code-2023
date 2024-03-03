@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use pest_consume::{match_nodes, Error, Parser};
 
 #[derive(Debug)]
@@ -10,21 +12,40 @@ struct ScratchCard {
     our_numbers: Vec<u8>,
 }
 
-impl ScratchCard {
-    fn parse_scratchcards(input: &str) -> anyhow::Result<Vec<Self>> {
-        let parts = ScratchCardsParser::parse(Rule::input, input)?;
-        let parts = parts.single()?;
-        ScratchCardsParser::input(parts).map_err(Into::into)
-    }
+#[derive(Debug)]
+struct ScratchCards {
+    cards: Vec<ScratchCard>,
+}
 
+impl FromStr for ScratchCards {
+    type Err = Error<Rule>;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let parts = ScratchCardsParser::parse(Rule::input, s)?.single()?;
+        Ok(ScratchCards {
+            cards: ScratchCardsParser::input(parts).map_err(Into::into)?,
+        })
+    }
+}
+
+impl IntoIterator for ScratchCards {
+    type Item = ScratchCard;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.cards.into_iter()
+    }
+}
+
+impl ScratchCard {
     fn sum_of_values(input: &str) -> anyhow::Result<u32> {
-        Ok(Self::parse_scratchcards(input)?
-            .iter()
+        Ok(ScratchCards::from_str(input)?
+            .into_iter()
             .map(ScratchCard::value)
             .sum::<u32>())
     }
 
-    fn value(&self) -> u32 {
+    fn value(self) -> u32 {
         todo!()
     }
 }
