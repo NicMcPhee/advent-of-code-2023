@@ -1,15 +1,12 @@
 use std::str::FromStr;
 
+use fixedbitset::FixedBitSet;
 use pest_consume::{match_nodes, Error, Parser};
 
 #[derive(Debug)]
 struct ScratchCard {
-    // TODO: Convert these to `HashSet` so I can use `intersection` to determine the winning cards easily
-    // Alternatively, we could use the `bit-set` crate, which gives
-    // use the `BitSet` type, which would work fine here. That would
-    // certainly use less storage and probably(?) be faster.
-    winning_numbers: Vec<u8>,
-    our_numbers: Vec<u8>,
+    winning_numbers: FixedBitSet,
+    our_numbers: FixedBitSet,
 }
 
 #[derive(Debug)]
@@ -38,15 +35,20 @@ impl IntoIterator for ScratchCards {
 }
 
 impl ScratchCard {
-    fn sum_of_values(input: &str) -> anyhow::Result<u32> {
+    fn sum_of_values(input: &str) -> anyhow::Result<usize> {
         Ok(ScratchCards::from_str(input)?
             .into_iter()
             .map(ScratchCard::value)
-            .sum::<u32>())
+            .sum::<usize>())
     }
 
-    fn value(self) -> u32 {
-        todo!()
+    fn value(self) -> usize {
+        let num_winning_numbers = self.winning_numbers.intersection(&self.our_numbers).count();
+        if num_winning_numbers == 0 {
+            0
+        } else {
+            2usize.pow(num_winning_numbers as u32 - 1)
+        }
     }
 }
 
@@ -74,9 +76,9 @@ impl ScratchCardsParser {
         })
     }
 
-    fn numbers(input: Node) -> Result<Vec<u8>> {
+    fn numbers(input: Node) -> Result<FixedBitSet> {
         Ok(match_nodes! { input.into_children();
-            [number(n)..] => n.collect(),
+            [number(n)..] => n.map(Into::into).collect::<FixedBitSet>(),
         })
     }
 
@@ -90,7 +92,7 @@ impl ScratchCardsParser {
 }
 
 fn main() -> anyhow::Result<()> {
-    let input = include_str!("../inputs/day_04_test.txt");
+    let input = include_str!("../inputs/day_04.txt");
     let result = ScratchCard::sum_of_values(input)?;
     println!("Result: {}", result);
 
@@ -108,10 +110,10 @@ mod day_04_part_1_tests {
         assert_eq!(result, 13);
     }
 
-    // #[test]
-    // fn check_full_input() {
-    //     let input = include_str!("../inputs/day_04.txt");
-    //     let result = ScratchCard::sum_of_values(input).unwrap();
-    //     assert_eq!(result, todo!());
-    // }
+    #[test]
+    fn check_full_input() {
+        let input = include_str!("../inputs/day_04.txt");
+        let result = ScratchCard::sum_of_values(input).unwrap();
+        assert_eq!(result, 25174);
+    }
 }
