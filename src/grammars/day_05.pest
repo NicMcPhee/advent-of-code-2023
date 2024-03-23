@@ -1,0 +1,30 @@
+// seeds: 79 14 55 13
+
+// seed-to-soil map:
+// 50 98 2
+// 52 50 48
+
+input = { seeds ~ map+ }
+
+seeds = { "seeds:" ~ number+ }
+
+map = { map_title ~ "map:" ~ range_mapping+ }
+
+map_title = { #source = mapping_type ~ "-to-" ~ #dest = mapping_type }
+
+range_mapping = { #dest_start = number ~ #source_start = number ~ #length = number }
+
+mapping_type = {
+    "seed" |
+    "soil" |
+    "fertilizer" |
+    "water" |
+    "light" |
+    "temperature" |
+    "humidity" |
+    "location"
+}
+
+number = @{ ASCII_DIGIT+ }
+
+WHITESPACE = _{ " " | "\t" | "\n" }

@@ -13,6 +13,7 @@ anyhow = "1.0.79"
 nom = "7.1.3"
 itertools = "0.12.1"
 fixedbitset = "0.5.1"
+rayon = "1.9.0"
 
 [package.metadata.clippy]
 warn = ["pedantic", "nursery", "unwrap_used", "expect_used"]
