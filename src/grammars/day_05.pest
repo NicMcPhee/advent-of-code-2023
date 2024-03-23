@@ -10,11 +10,20 @@ seeds = { "seeds:" ~ number+ }
 
 map = { map_title ~ "map:" ~ range_mapping+ }
 
-map_title = { #source = name ~ "-to-" ~ #dest = name }
+map_title = { #source = mapping_type ~ "-to-" ~ #dest = mapping_type }
 
 range_mapping = { #dest_start = number ~ #source_start = number ~ #length = number }
 
-name = @{ ASCII_ALPHA+ }
+mapping_type = {
+    "seed" |
+    "soil" |
+    "fertilizer" |
+    "water" |
+    "light" |
+    "temperature" |
+    "humidity" |
+    "location"
+}
 
 number = @{ ASCII_DIGIT+ }
 
