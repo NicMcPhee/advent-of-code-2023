@@ -15,6 +15,26 @@ enum MappingType {
     Location,
 }
 
+struct UnknownMappingTypeError(String);
+
+impl FromStr for MappingType {
+    type Err = UnknownMappingTypeError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(match s {
+            "seed" => MappingType::Seed,
+            "soil" => MappingType::Soil,
+            "fertilizer" => MappingType::Fertilizer,
+            "water" => MappingType::Water,
+            "light" => MappingType::Light,
+            "temperature" => MappingType::Temperature,
+            "humidity" => MappingType::Humidity,
+            "location" => MappingType::Location,
+            _ => return Err(UnknownMappingTypeError(s.to_string())),
+        })
+    }
+}
+
 #[derive(Debug)]
 struct Almanac {
     /// Each entry in this `Vec` is a range of seed values,
@@ -150,18 +170,7 @@ impl AlmanacParser {
     }
 
     fn mapping_type(input: Node) -> Result<MappingType> {
-        let str = input.as_str();
-        Ok(match str {
-            "seed" => MappingType::Seed,
-            "soil" => MappingType::Soil,
-            "fertilizer" => MappingType::Fertilizer,
-            "water" => MappingType::Water,
-            "light" => MappingType::Light,
-            "temperature" => MappingType::Temperature,
-            "humidity" => MappingType::Humidity,
-            "location" => MappingType::Location,
-            _ => return Err(input.error("Unknown mapping type")),
-        })
+        return MappingType::from_str(input.as_str()).map_err(|e| input.error(e.0));
     }
 
     fn number(input: Node) -> Result<u64> {
