@@ -182,7 +182,7 @@ impl AlmanacParser {
     }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let input = include_str!("../inputs/day_05.txt");
     let almanac = Almanac::from_str(input)?;
     let result = almanac.lowest_location().expect("No location found");
