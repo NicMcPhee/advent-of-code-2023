@@ -56,16 +56,19 @@ impl Almanac {
 
     fn lowest_location(&self) -> Option<u64> {
         self.seeds
-            // Parallelizing the processing of the seed ranges speeds things up nearly
+            // Parallelizing the processing of the seed ranges speeds things up fairly
             // substantially on my laptop, which has 12 cores. Without parallelization,
-            // this took nearly 90 seconds, where with parallelization it took about 10.
+            // this took nearly 90 seconds, where with parallelization it took about 10s.
             .par_iter()
+            // A reference to a range can't be iterated over, and thus can't be flattened.
+            // Cloning converts the references into owned ranges, which can be iterated over.
+            // and thus can be flattened in the next step.
             .cloned()
             .flatten()
             // We tried putting the parallelization here using `par_bridge()`, and that
             // really slowed things down, taking over 240 seconds. Putting it here creates
             // all the seed values _before_ the parallelization, which puts the parallelization
-            // to late in the process to have the desired effect, and presumably the overhead
+            // too late in the process to have the desired effect, and presumably the overhead
             // of creating the seed values is high.
             .map(|s| self.convert(s))
             .min()
