@@ -50,6 +50,11 @@ struct Almanac {
 }
 
 impl Almanac {
+    fn new(seeds: Vec<Range<u64>>, mut maps: Vec<Mapping>) -> Self {
+        maps.iter_mut().for_each(Mapping::sort_and_fill);
+        Self { seeds, maps }
+    }
+
     fn convert(&self, value: u64) -> u64 {
         self.maps.iter().fold(value, |acc, m| m.convert(acc))
     }
@@ -91,6 +96,33 @@ impl Mapping {
             .find_map(|r| r.convert(value))
             .unwrap_or(value)
     }
+
+    fn sort_and_fill(&mut self) {
+        self.ranges.sort();
+        let original_ranges = std::mem::take(&mut self.ranges);
+        let mut expected_start = 0;
+        for range_mapping in original_ranges {
+            if expected_start < range_mapping.range.start {
+                let padding = RangeMapping {
+                    range: expected_start..range_mapping.range.start,
+                    offset: 0,
+                };
+                self.ranges.push(padding);
+            }
+            expected_start = range_mapping.range.end;
+            self.ranges.push(range_mapping);
+        }
+        if expected_start != u64::MAX {
+            let padding = RangeMapping {
+                range: expected_start..u64::MAX,
+                offset: 0,
+            };
+            self.ranges.push(padding);
+        }
+    }
+
+    // Compose two mappings, returning a new mapping.
+    // fn compose(&self, other: &Mapping) -> Mapping {}
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -142,10 +174,7 @@ type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 impl AlmanacParser {
     fn input(input: Node) -> Result<Almanac> {
         Ok(match_nodes! { input.into_children();
-            [seeds(seeds), map(m)..] => Almanac {
-                seeds,
-                maps: m.collect(),
-            },
+            [seeds(seeds), map(m)..] => Almanac::new(seeds, m.collect()),
         })
     }
 
