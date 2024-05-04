@@ -93,10 +93,24 @@ impl Mapping {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct RangeMapping {
+    // The range is the set of values in the source type.
     range: Range<u64>,
+    // The offset to the location in the target type.
     offset: i64,
+}
+
+impl PartialOrd for RangeMapping {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for RangeMapping {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.range.start.cmp(&other.range.start)
+    }
 }
 
 impl RangeMapping {
