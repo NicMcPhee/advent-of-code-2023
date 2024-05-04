@@ -1,4 +1,4 @@
-use std::{ops::Range, str::FromStr};
+use std::{fmt::Display, ops::Range, str::FromStr};
 
 use pest_consume::{match_nodes, Error, Parser};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -13,6 +13,21 @@ enum MappingType {
     Temperature,
     Humidity,
     Location,
+}
+
+impl Display for MappingType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Seed => "seed",
+            Self::Soil => "soil",
+            Self::Fertilizer => "fertilizer",
+            Self::Water => "water",
+            Self::Light => "light",
+            Self::Temperature => "temperature",
+            Self::Humidity => "humidity",
+            Self::Location => "location",
+        })
+    }
 }
 
 struct UnknownMappingTypeError(String);
@@ -47,6 +62,26 @@ struct Almanac {
     /// (We don't currently _check_ this, though, so it's crucial
     /// that this is correct in the parsed input file.)
     maps: Vec<Mapping>,
+}
+
+impl Display for Almanac {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("seeds:")?;
+        for seed in &self.seeds {
+            let range_len = seed.end - seed.start - 1;
+            f.write_str(" ")?;
+            seed.start.fmt(f)?;
+            f.write_str(" ")?;
+            range_len.fmt(f)?;
+        }
+        f.write_str("\n\n")?;
+
+        for map in &self.maps {
+            map.fmt(f)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Almanac {
@@ -87,6 +122,28 @@ struct Mapping {
     #[allow(dead_code)]
     target: MappingType,
     ranges: Vec<RangeMapping>,
+}
+
+impl Display for Mapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.source.fmt(f)?;
+        f.write_str("-to-")?;
+        self.target.fmt(f)?;
+        f.write_str(" map:\n")?;
+
+        for range in &self.ranges {
+            let dest_start = i128::from(range.range.start) + i128::from(range.offset);
+            dest_start.fmt(f)?;
+            f.write_str(" ")?;
+            range.range.start.fmt(f)?;
+            f.write_str(" ")?;
+            let range_len = range.range.end - range.range.start - 1;
+            range_len.fmt(f)?;
+            f.write_str("\n")?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Mapping {
