@@ -1,9 +1,8 @@
-use std::{fmt::Display, ops::Range, str::FromStr};
+use std::{cmp::Ordering, fmt::Display, ops::Range, str::FromStr};
 
 use pest_consume::{match_nodes, Error, Parser};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum MappingType {
     Seed,
     Soil,
@@ -91,29 +90,24 @@ impl Almanac {
         Self {
             seeds,
             combined_mapping,
-    }
-
-    fn convert(&self, value: u64) -> u64 {
-        self.maps.iter().fold(value, |acc, m| m.convert(acc))
+        }
     }
 
     fn lowest_location(&self) -> Option<u64> {
         self.seeds
-            // Parallelizing the processing of the seed ranges speeds things up fairly
-            // substantially on my laptop, which has 12 cores. Without parallelization,
-            // this took nearly 90 seconds, where with parallelization it took about 10s.
-            .par_iter()
-            // A reference to a range can't be iterated over, and thus can't be flattened.
-            // Cloning converts the references into owned ranges, which can be iterated over.
-            // and thus can be flattened in the next step.
+            .iter()
             .cloned()
-            .flatten()
-            // We tried putting the parallelization here using `par_bridge()`, and that
-            // really slowed things down, taking over 240 seconds. Putting it here creates
-            // all the seed values _before_ the parallelization, which puts the parallelization
-            // too late in the process to have the desired effect, and presumably the overhead
-            // of creating the seed values is high.
-            .map(|s| self.convert(s))
+            // Convert every seed range to a `RangeMapping`.
+            .map(RangeMapping::from_range)
+            // Compose each seed `RangeMapping` with the combined mapping. This
+            // returns an iterator over all the ranges in the final target type
+            // (`location` in this problem). These ranges are the various ranges
+            // in the final target space that are reachable from any of the initial
+            // seed ranges.
+            .flat_map(|mapping| mapping.compose(self.combined_mapping.as_ref().unwrap()))
+            // Map each of these reachable ranges to their starting value.
+            .map(|r| r.output_range_start())
+            // Take the minimum of those values to find the lowest value location.
             .min()
     }
 }
@@ -150,13 +144,6 @@ impl Display for Mapping {
 }
 
 impl Mapping {
-    fn convert(&self, value: u64) -> u64 {
-        self.ranges
-            .iter()
-            .find_map(|r| r.convert(value))
-            .unwrap_or(value)
-    }
-
     fn sort_and_fill(&mut self) {
         self.ranges.sort();
         let original_ranges = std::mem::take(&mut self.ranges);
@@ -181,8 +168,46 @@ impl Mapping {
         }
     }
 
-    // Compose two mappings, returning a new mapping.
-    // fn compose(&self, other: &Mapping) -> Mapping {}
+    // Compose two mappings, returning a new mapping that maps from the source
+    // space of `self` to the target space of `other`.
+    fn compose(self, other: Mapping) -> Mapping {
+        let new_ranges = self
+            .ranges
+            .into_iter()
+            // Compose each `RangeMapping` in `self` with `other`.
+            // This returns a vector of `RangeMapping`s, so `flat_map`
+            // brings all those together into a single `Vec<RangeMapping>`.
+            .flat_map(|r| r.compose(&other))
+            .collect();
+        Mapping {
+            source: self.source,
+            target: other.target,
+            ranges: new_ranges,
+        }
+    }
+
+    // Use binary search to find the `RangeMapping` that will map the given
+    // `source_index` to a target value.
+    fn lookup(&self, source_index: u64) -> Option<&RangeMapping> {
+        self.ranges
+            .binary_search_by(|r| {
+                if source_index < r.range.start {
+                    // The range `r` is "greater than" (to the right
+                    // of) `source_index.`
+                    Ordering::Greater
+                } else if r.range.contains(&source_index) {
+                    // The range `r` contains `source_index`, so we've
+                    // found the desired range.
+                    Ordering::Equal
+                } else {
+                    // The range `r` is "less than" (to the left
+                    // of) `source_index`.
+                    Ordering::Less
+                }
+            })
+            .ok()
+            .and_then(|idx| self.ranges.get(idx))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -206,11 +231,55 @@ impl Ord for RangeMapping {
 }
 
 impl RangeMapping {
-    fn convert(&self, value: u64) -> Option<u64> {
-        if !self.range.contains(&value) {
-            return None;
+    fn from_range(range: Range<u64>) -> RangeMapping {
+        RangeMapping { range, offset: 0 }
+    }
+
+    fn output_range_start(&self) -> u64 {
+        self.range.start.saturating_add_signed(self.offset)
+    }
+
+    // This essentially divides `self` up into a group of contiguous chunks
+    // that each map to a different target `RangeMapping` in `other`.
+    fn compose(self, other: &Mapping) -> Vec<Self> {
+        let mut result = Vec::new();
+        // `current_start` is the starting index of the next chunk of
+        // `self` that we need to map. That starts at the beginning of
+        // `self`.
+        let mut current_start = self.range.start;
+        // As long as `current_start` is less than `self.range.end`, there's
+        // still at least one more non-empty chunk to process.
+        while current_start < self.range.end {
+            let target_range = other
+                // We need to lookup the `RangeMapping` in `other` that the `current_start`
+                // would map to after adding the `offset`. Using `saturating_add_signed()`
+                // deals with the fact that `current_start` is `u64` and `self.offset` is `i64`,
+                // leaving us at `u64::MAX` if for some reason we were to go "off the end".
+                .lookup(current_start.saturating_add_signed(self.offset))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "We didn't find a target for {}",
+                        current_start.saturating_add_signed(self.offset)
+                    )
+                });
+            // The end of this chunk will be the smaller of the end of `self` (if the remaining
+            // bit of `self` is shorter than the `target_range`) and the
+            // end of the `target_range`, reverse offset back into the source space
+            // (if the `target_range` is shorter than what's left of `self`).
+            let current_end = self
+                .range
+                .end
+                .min(target_range.range.end.saturating_add_signed(-self.offset));
+            let new_mapping = RangeMapping {
+                range: current_start..current_end,
+                // We can just add the two range offsets to get the combined offset.
+                offset: self.offset + target_range.offset,
+            };
+            result.push(new_mapping);
+            current_start = current_end;
         }
-        Some((value as i64 + self.offset) as u64)
+
+        result
     }
 }
 
