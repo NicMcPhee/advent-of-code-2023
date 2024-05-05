@@ -367,7 +367,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(test)]
-mod day_04_part_1_tests {
+mod day_05_part_2_tests {
     use super::*;
 
     #[test]
@@ -379,7 +379,6 @@ mod day_04_part_1_tests {
     }
 
     #[test]
-    #[ignore = "This test takes several minutes to run"]
     fn check_full_input() {
         let input = include_str!("../inputs/day_05.txt");
         let almanac = Almanac::from_str(input).unwrap();

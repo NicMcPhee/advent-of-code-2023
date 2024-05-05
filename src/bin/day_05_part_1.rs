@@ -155,7 +155,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 #[cfg(test)]
-mod day_04_part_1_tests {
+mod day_05_part_1_tests {
     use super::*;
 
     #[test]
