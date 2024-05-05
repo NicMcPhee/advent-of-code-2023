@@ -61,7 +61,7 @@ struct Almanac {
     /// so the `target`` of one map is the `source`` of the next.
     /// (We don't currently _check_ this, though, so it's crucial
     /// that this is correct in the parsed input file.)
-    maps: Vec<Mapping>,
+    combined_mapping: Option<Mapping>,
 }
 
 impl Display for Almanac {
@@ -76,9 +76,9 @@ impl Display for Almanac {
         }
         f.write_str("\n\n")?;
 
-        for map in &self.maps {
-            map.fmt(f)?;
-        }
+        if let Some(mapping) = &self.combined_mapping {
+            mapping.fmt(f)?
+        };
 
         Ok(())
     }
@@ -87,7 +87,10 @@ impl Display for Almanac {
 impl Almanac {
     fn new(seeds: Vec<Range<u64>>, mut maps: Vec<Mapping>) -> Self {
         maps.iter_mut().for_each(Mapping::sort_and_fill);
-        Self { seeds, maps }
+        let combined_mapping = maps.into_iter().reduce(Mapping::compose);
+        Self {
+            seeds,
+            combined_mapping,
     }
 
     fn convert(&self, value: u64) -> u64 {
