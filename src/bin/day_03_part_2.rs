@@ -73,12 +73,12 @@ struct Schematic {
 
 impl Schematic {
     fn sum_of_gear_ratios(&self) -> u32 {
-        self.gears.iter().flat_map(|gear| self.ratio(gear)).sum()
+        self.gears.iter().filter_map(|gear| self.ratio(gear)).sum()
     }
 
     fn ratio(&self, gear: &Gear) -> Option<u32> {
         gear.adjacent_fields()
-            .flat_map(|location| self.parts.get(&location))
+            .filter_map(|location| self.parts.get(&location))
             .unique()
             .map(|part| part.number)
             .next_two()
@@ -99,7 +99,7 @@ impl FromIterator<Cell> for Schematic {
                 Cell::Gear(gear) => gears.push(gear),
             }
         }
-        Schematic { parts, gears }
+        Self { parts, gears }
     }
 }
 
@@ -157,7 +157,7 @@ fn parse_schematic(input: &str) -> anyhow::Result<Schematic> {
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_03.txt");
     let result = parse_schematic(input)?.sum_of_gear_ratios();
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -170,13 +170,13 @@ mod tests {
     fn check_test_input() {
         let input = include_str!("../inputs/day_03_test.txt");
         let result = parse_schematic(input).unwrap().sum_of_gear_ratios();
-        assert_eq!(result, 467835);
+        assert_eq!(result, 467_835);
     }
 
     #[test]
     fn check_full_input() {
         let input = include_str!("../inputs/day_03.txt");
         let result = parse_schematic(input).unwrap().sum_of_gear_ratios();
-        assert_eq!(result, 72246648);
+        assert_eq!(result, 72_246_648);
     }
 }

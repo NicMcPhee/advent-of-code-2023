@@ -28,6 +28,7 @@ impl Part {
 
 #[derive(Debug)]
 struct Symbol {
+    #[allow(clippy::struct_field_names)]
     symbol: char,
     line: usize,
     column: usize,
@@ -76,7 +77,7 @@ impl FromIterator<Cell> for Schematic {
                 }
             }
         }
-        Schematic { parts, symbols }
+        Self { parts, symbols }
     }
 }
 
@@ -143,7 +144,7 @@ fn parse_schematic(input: &str) -> anyhow::Result<Schematic> {
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_03.txt");
     let result = parse_schematic(input)?.sum_of_part_numbers();
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -163,6 +164,6 @@ mod tests {
     fn check_full_input() {
         let input = include_str!("../inputs/day_03.txt");
         let result = parse_schematic(input).unwrap().sum_of_part_numbers();
-        assert_eq!(result, 498559);
+        assert_eq!(result, 498_559);
     }
 }

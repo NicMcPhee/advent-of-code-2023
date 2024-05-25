@@ -14,5 +14,5 @@ fn main() {
 
     let result = lines.map(calibration_value).sum::<u32>();
 
-    println!("Result: {}", result);
+    println!("Result: {result}");
 }

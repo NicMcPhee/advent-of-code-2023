@@ -36,14 +36,14 @@ impl FromStr for MappingType {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(match s {
-            "seed" => MappingType::Seed,
-            "soil" => MappingType::Soil,
-            "fertilizer" => MappingType::Fertilizer,
-            "water" => MappingType::Water,
-            "light" => MappingType::Light,
-            "temperature" => MappingType::Temperature,
-            "humidity" => MappingType::Humidity,
-            "location" => MappingType::Location,
+            "seed" => Self::Seed,
+            "soil" => Self::Soil,
+            "fertilizer" => Self::Fertilizer,
+            "water" => Self::Water,
+            "light" => Self::Light,
+            "temperature" => Self::Temperature,
+            "humidity" => Self::Humidity,
+            "location" => Self::Location,
             _ => return Err(UnknownMappingTypeError(s.to_string())),
         })
     }
@@ -57,7 +57,7 @@ struct Almanac {
     /// Each entry in this `Vec` is a mapping from one type
     /// of value to another, e.g., from `seed` to `soil`. For
     /// this to work, the maps have to be in the right order,
-    /// so the `target`` of one map is the `source`` of the next.
+    /// so the `target` of one map is the `source` of the next.
     /// (We don't currently _check_ this, though, so it's crucial
     /// that this is correct in the parsed input file.)
     combined_mapping: Option<Mapping>,
@@ -76,7 +76,7 @@ impl Display for Almanac {
         f.write_str("\n\n")?;
 
         if let Some(mapping) = &self.combined_mapping {
-            mapping.fmt(f)?
+            mapping.fmt(f)?;
         };
 
         Ok(())
@@ -170,7 +170,8 @@ impl Mapping {
 
     // Compose two mappings, returning a new mapping that maps from the source
     // space of `self` to the target space of `other`.
-    fn compose(self, other: Mapping) -> Mapping {
+    #[allow(clippy::needless_pass_by_value)]
+    fn compose(self, other: Self) -> Self {
         let new_ranges = self
             .ranges
             .into_iter()
@@ -179,7 +180,7 @@ impl Mapping {
             // brings all those together into a single `Vec<RangeMapping>`.
             .flat_map(|r| r.compose(&other))
             .collect();
-        Mapping {
+        Self {
             source: self.source,
             target: other.target,
             ranges: new_ranges,
@@ -231,11 +232,11 @@ impl Ord for RangeMapping {
 }
 
 impl RangeMapping {
-    fn from_range(range: Range<u64>) -> RangeMapping {
-        RangeMapping { range, offset: 0 }
+    const fn from_range(range: Range<u64>) -> Self {
+        Self { range, offset: 0 }
     }
 
-    fn output_range_start(&self) -> u64 {
+    const fn output_range_start(&self) -> u64 {
         self.range.start.saturating_add_signed(self.offset)
     }
 
@@ -270,7 +271,7 @@ impl RangeMapping {
                 .range
                 .end
                 .min(target_range.range.end.saturating_add_signed(-self.offset));
-            let new_mapping = RangeMapping {
+            let new_mapping = Self {
                 range: current_start..current_end,
                 // We can just add the two range offsets to get the combined offset.
                 offset: self.offset + target_range.offset,
@@ -339,6 +340,7 @@ impl AlmanacParser {
         Ok(match_nodes! { input.into_children();
             [number(dest_start), number(source_start), number(length)] => RangeMapping {
                 range: source_start..source_start +length,
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 offset: dest_start as i64 - source_start as i64,
             },
         })
@@ -361,7 +363,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let input = include_str!("../inputs/day_05.txt");
     let almanac = Almanac::from_str(input)?;
     let result = almanac.lowest_location().expect("No location found");
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -383,6 +385,6 @@ mod day_05_part_2_tests {
         let input = include_str!("../inputs/day_05.txt");
         let almanac = Almanac::from_str(input).unwrap();
         let result = almanac.lowest_location().unwrap();
-        assert_eq!(result, 2008785);
+        assert_eq!(result, 2_008_785);
     }
 }
