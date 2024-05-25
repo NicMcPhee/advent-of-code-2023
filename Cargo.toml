@@ -18,3 +18,7 @@ strum = { version = "0.26.2", features = ["derive"] }
 
 [package.metadata.clippy]
 warn = ["pedantic", "nursery", "unwrap_used", "expect_used"]
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
