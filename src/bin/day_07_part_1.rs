@@ -1,5 +1,5 @@
 use anyhow::Context;
-use std::{cmp::Ordering, fmt::Display, ops::Range, str::FromStr};
+use std::str::FromStr;
 use strum::FromRepr;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, FromRepr)]
@@ -53,27 +53,13 @@ enum HandType {
 // if it's not `Equal`. If it is `Equal`, then it moves
 // on to `cards`, checking them left to right, using
 // the ordered provided by the discriminator in the
-// enumeration.
+// enumeration. This is exactly the ordering required
+// by the problem, which is quite cool.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct Hand {
     hand_type: HandType,
     cards: [Card; 5],
 }
-
-// impl Ord for Hand {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         // Implement the lexicographical ordering on arrays of cards.
-//         self.hand_type
-//             .cmp(&other.hand_type)
-//             .then_with(|| self.cards.cmp(&other.cards))
-//     }
-// }
-
-// impl PartialOrd for Hand {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
 
 impl Hand {
     pub fn new(cards: [Card; 5]) -> Self {
