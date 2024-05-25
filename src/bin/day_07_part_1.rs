@@ -1,8 +1,9 @@
 use anyhow::Context;
+use itertools::Itertools;
 use std::str::FromStr;
 use strum::FromRepr;
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, FromRepr)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, FromRepr, Hash)]
 #[repr(u8)]
 enum Card {
     Two = 2,
@@ -70,12 +71,22 @@ impl Hand {
     }
 
     fn classify_hand(cards: &[Card; 5]) -> HandType {
-        // Use Itertools.counts() and a bunch of matching.
-        todo!()
+        let mut counts = cards.iter().counts().into_values().collect::<Vec<_>>();
+        counts.sort_unstable();
+        match &counts[..] {
+            [5] => HandType::FiveOfAKind,
+            [1, 4] => HandType::FourOfAKind,
+            [2, 3] => HandType::FullHouse,
+            [1, 1, 3] => HandType::ThreeOfAKind,
+            [1, 2, 2] => HandType::TwoPair,
+            [1, 1, 1, 2] => HandType::OnePair,
+            [1, 1, 1, 1, 1] => HandType::HighCard,
+            _ => unreachable!("Illegal hand to classify"),
+        }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 struct Round {
     hand: Hand,
     bid: u32,
@@ -119,16 +130,20 @@ impl FromStr for Game {
 }
 
 impl Game {
-    pub fn total_winnings(&self) -> anyhow::Result<u64> {
-        // sort then multiply and add
-        todo!();
+    pub fn total_winnings(&mut self) -> u32 {
+        self.rounds.sort();
+        self.rounds
+            .iter()
+            .enumerate()
+            .map(|(pos, round)| (pos as u32 + 1) * round.bid)
+            .sum()
     }
 }
 
 fn main() -> anyhow::Result<()> {
-    let input = include_str!("../inputs/day_07_test.txt");
-    let game = Game::from_str(input)?;
-    let result = game.total_winnings()?;
+    let input = include_str!("../inputs/day_07.txt");
+    let mut game = Game::from_str(input)?;
+    let result = game.total_winnings();
     println!("Result: {}", result);
 
     Ok(())
@@ -141,16 +156,16 @@ mod day_07_part_1_tests {
     #[test]
     fn check_test_input() {
         let input = include_str!("../inputs/day_07_test.txt");
-        let game = Game::from_str(input).unwrap();
-        let result = game.total_winnings().unwrap();
+        let mut game = Game::from_str(input).unwrap();
+        let result = game.total_winnings();
         assert_eq!(result, 6440);
     }
 
     #[test]
     fn check_full_input() {
         let input = include_str!("../inputs/day_07.txt");
-        let game = Game::from_str(input).unwrap();
-        let result = game.total_winnings().unwrap();
-        assert_eq!(result, 2008785);
+        let mut game = Game::from_str(input).unwrap();
+        let result = game.total_winnings();
+        assert_eq!(result, 248836197);
     }
 }
