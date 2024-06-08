@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chumsky::prelude::*;
 use text::newline;
 
@@ -17,7 +19,7 @@ struct Connection<'a> {
 #[derive(Debug)]
 struct Map<'a> {
     path: Vec<Direction>,
-    connections: Vec<Connection<'a>>,
+    connections: HashMap<&'a str, Connection<'a>>,
 }
 
 fn parser<'a>() -> impl Parser<'a, &'a str, Map<'a>> {
@@ -28,9 +30,10 @@ fn parser<'a>() -> impl Parser<'a, &'a str, Map<'a>> {
     path.padded()
         .then(
             connection
+                .map(|c| (c.node_name, c))
                 .separated_by(newline())
                 .at_least(1)
-                .collect::<Vec<_>>(),
+                .collect::<HashMap<_, _>>(),
         )
         .padded()
         .map(|(path, connections)| Map { path, connections })
