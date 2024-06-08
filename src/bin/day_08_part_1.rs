@@ -79,14 +79,33 @@ fn path<'a>() -> impl Parser<'a, &'a str, Vec<Direction>> {
     .padded()
 }
 
-impl Map<'_> {
-    fn num_steps(&self) -> u32 {
-        todo!()
+impl<'a> Map<'a> {
+    fn next_node(&self, node: &mut &'a str, direction: Direction) -> Option<&'a str> {
+        let Some(connection) = self.connections.get(node) else {
+            panic!(
+                "Failed to find node {node} in the connections map: {:#?}",
+                self.connections
+            )
+        };
+        let new_node = connection.step(direction);
+        (new_node != "ZZZ").then(|| {
+            *node = new_node;
+            new_node
+        })
+    }
+
+    fn num_steps(&self) -> usize {
+        let steps = self.path.iter().copied().cycle();
+        let visited_nodes =
+            steps.scan("AAA", |current_node: &mut &'a str, direction: Direction| {
+                self.next_node(current_node, direction)
+            });
+        visited_nodes.count() + 1
     }
 }
 
 fn main() -> anyhow::Result<()> {
-    let input = include_str!("../inputs/day_08_test_1.txt");
+    let input = include_str!("../inputs/day_08.txt");
 
     let map = parser().parse(input).into_result().map_err(|parse_errs| {
         for e in parse_errs {
@@ -95,7 +114,8 @@ fn main() -> anyhow::Result<()> {
         anyhow::anyhow!("Parsing error")
     })?;
 
-    dbg!(&map);
+    // dbg!(&map);
+
     let result = map.num_steps();
     println!("Result: {result}");
 
@@ -167,6 +187,6 @@ mod day_08_part_1_tests {
         let input = include_str!("../inputs/day_08.txt");
         let map = parser().parse(input).into_result().unwrap();
         let result = map.num_steps();
-        assert_eq!(result, 251_195_607);
+        assert_eq!(result, 21_409);
     }
 }
