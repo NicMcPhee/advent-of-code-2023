@@ -16,6 +16,15 @@ struct Connection<'a> {
     right: &'a str,
 }
 
+impl<'a> Connection<'a> {
+    const fn step(&self, direction: Direction) -> &'a str {
+        match direction {
+            Direction::Left => self.left,
+            Direction::Right => self.right,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Map<'a> {
     path: Vec<Direction>,
