@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chumsky::prelude::*;
+use num::Integer;
 use text::newline;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -80,57 +81,86 @@ fn path<'a>() -> impl Parser<'a, &'a str, Vec<Direction>> {
 }
 
 impl<'a> Map<'a> {
-    fn advance_node(&self, node: &mut &'a str, direction: Direction) {
+    fn advance_node(&self, node: &'a str, direction: Direction) -> &'a str {
         let Some(connection) = self.connections.get(node) else {
             panic!(
                 "Failed to find node {node} in the connections map: {:#?}",
                 self.connections
             )
         };
-        *node = connection.step(direction);
+        connection.step(direction)
     }
 
-    fn next_nodes(&self, nodes: &mut [&'a str], direction: Direction) -> Option<Vec<&'a str>> {
-        nodes
-            .iter_mut()
-            .for_each(|n| self.advance_node(n, direction));
-        nodes
-            .iter()
-            .any(|n| !n.ends_with('Z'))
-            .then(|| nodes.to_vec())
+    // Returns (num steps to first occurance, cycle length)
+    fn cycle_length(&self, starting_node: &str) -> (usize, usize) {
+        type PathIndex = usize;
+        type StepCount = usize;
+
+        // (node, LR chain position) -> total step count
+        let mut visited_nodes: HashMap<(&str, PathIndex), StepCount> = HashMap::new();
+        // An "infinite" iterator over the path steps, repeated indefinitely. Clever uses
+        // of `.enumerate()` (thanks to @MizardX) lead to automagic numbering of the steps,
+        // where the "outer" number is the total number of steps to that point, and the
+        // "inner" number is the current index into the input path.
+        let steps = self.path.iter().copied().enumerate().cycle().enumerate();
+
+        let mut current_node = starting_node;
+        visited_nodes.insert((current_node, 0), 0);
+
+        for (step_count, (path_index, direction)) in steps {
+            current_node = self.advance_node(current_node, direction);
+            // We only care about storing "end" nodes in the map, and can ignore all the
+            // other nodes (except for the need to count them in path lengths).
+            if current_node.ends_with('Z') {
+                if let Some(initial_steps_to_node) = visited_nodes.get(&(current_node, path_index))
+                {
+                    // If we've seen this node/path index pair then we've found a cycle!
+                    let cycle_length = step_count - initial_steps_to_node;
+                    return (*initial_steps_to_node + 1, cycle_length);
+                }
+                println!("From {starting_node} reached {current_node} with path index {path_index} and step count {step_count}.");
+                visited_nodes.insert((current_node, path_index), step_count);
+            }
+        }
+        unreachable!("The loop above is infinite and should exit via the `return` statement.");
     }
 
     fn num_steps(&self) -> usize {
-        let start_nodes = self
+        let starting_points: Vec<(&&str, &Connection)> = self
             .connections
-            .keys()
-            .copied()
-            .filter(|k| k.ends_with('A'))
+            .iter()
+            .filter(|c| c.0.ends_with('A'))
             .collect::<Vec<_>>();
-        let steps = self.path.iter().copied().cycle();
-        let visited_nodes = steps.scan(
-            start_nodes,
-            |current_nodes: &mut Vec<&'a str>, direction: Direction| {
-                self.next_nodes(current_nodes, direction)
-            },
-        );
-        visited_nodes.count() + 1
+
+        // (num steps to first occurrence, cycle length)
+        let cycle_lengths: Vec<(usize, usize)> = starting_points
+            .iter()
+            .map(|s| self.cycle_length(s.0))
+            .collect::<Vec<_>>();
+
+        println!("Cycle lengths = {cycle_lengths:#?}");
+
+        let result = cycle_lengths
+            .iter()
+            .map(|(_, cl)| *cl)
+            .reduce(|acc, cl| acc.lcm(&cl))
+            .unwrap();
+        result
     }
 }
 
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_08.txt");
 
-    let map = parser().parse(input).into_result().map_err(|parse_errs| {
+    let map: Map = parser().parse(input).into_result().map_err(|parse_errs| {
         for e in parse_errs {
             println!("Parse error: {e:#?}");
         }
         anyhow::anyhow!("Parsing error")
     })?;
 
-    // dbg!(&map);
-
     let result = map.num_steps();
+
     println!("Result: {result}");
 
     Ok(())
@@ -161,7 +191,7 @@ mod parsing_tests {
     #[test]
     fn test_connection() {
         let connection = parse_connection()
-            .parse("AAA = (BBB, CCC)\nBBB = (DDD, EEE)")
+            .parse("AAA = (BBB, CCC)")
             .into_result()
             .expect("Failed to parse connection");
         assert_eq!(
@@ -193,6 +223,6 @@ mod day_08_part_1_tests {
         let input = include_str!("../inputs/day_08.txt");
         let map = parser().parse(input).into_result().unwrap();
         let result = map.num_steps();
-        assert_eq!(result, 21_409);
+        assert_eq!(result, 21_165_830_176_709);
     }
 }
