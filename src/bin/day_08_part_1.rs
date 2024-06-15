@@ -88,6 +88,8 @@ impl<'a> Map<'a> {
             )
         };
         let new_node = connection.step(direction);
+        // Return `None` if we've found the target node. Otherwise
+        // update `node` to be the `new_node` and return.
         (new_node != "ZZZ").then(|| {
             *node = new_node;
             new_node
@@ -95,7 +97,10 @@ impl<'a> Map<'a> {
     }
 
     fn num_steps(&self) -> usize {
+        // An "infinite" iterator over the path steps, repeated indefinitely.
         let steps = self.path.iter().copied().cycle();
+        // All the nodes we visit by traversing `steps`, terminating when we reach the target
+        // node ZZZ (i.e., when `.next_node()` returns `None`).
         let visited_nodes =
             steps.scan("AAA", |current_node: &mut &'a str, direction: Direction| {
                 self.next_node(current_node, direction)
