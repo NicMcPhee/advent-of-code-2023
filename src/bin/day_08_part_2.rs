@@ -109,6 +109,8 @@ impl<'a> Map<'a> {
 
         for (step_count, (path_index, direction)) in steps {
             current_node = self.advance_node(current_node, direction);
+            // Since we've just advanced the node, we need to also increment the step count
+            let step_count = step_count + 1;
             // We only care about storing "end" nodes in the map, and can ignore all the
             // other nodes (except for the need to count them in path lengths).
             if current_node.ends_with('Z') {
@@ -116,7 +118,7 @@ impl<'a> Map<'a> {
                 {
                     // If we've seen this node/path index pair then we've found a cycle!
                     let cycle_length = step_count - initial_steps_to_node;
-                    return (*initial_steps_to_node + 1, cycle_length);
+                    return (*initial_steps_to_node, cycle_length);
                 }
                 println!("From {starting_node} reached {current_node} with path index {path_index} and step count {step_count}.");
                 visited_nodes.insert((current_node, path_index), step_count);
@@ -126,20 +128,28 @@ impl<'a> Map<'a> {
     }
 
     fn num_steps(&self) -> usize {
+        // Find all the starting nodes, i.e., nodes ending in `A`
         let starting_points: Vec<(&&str, &Connection)> = self
             .connections
             .iter()
             .filter(|c| c.0.ends_with('A'))
             .collect::<Vec<_>>();
 
+        // For each starting point, compute its cycle information:
         // (num steps to first occurrence, cycle length)
         let cycle_lengths: Vec<(usize, usize)> = starting_points
             .iter()
             .map(|s| self.cycle_length(s.0))
             .collect::<Vec<_>>();
 
-        println!("Cycle lengths = {cycle_lengths:#?}");
+        // The number of steps to the first occurrence needs to equal the cycle
+        // length in each case.
+        assert!(
+            cycle_lengths.iter().all(|(nstfo, cl)| nstfo == cl),
+            "All the prefixes need to have the same lengths as the cycles"
+        );
 
+        // The answer is then the LCM of the lengths of each of the cycles.
         let result = cycle_lengths
             .iter()
             .map(|(_, cl)| *cl)
