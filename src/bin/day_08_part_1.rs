@@ -147,7 +147,7 @@ mod parsing_tests {
     #[test]
     fn test_connection() {
         let connection = parse_connection()
-            .parse("AAA = (BBB, CCC)\nBBB = (DDD, EEE)")
+            .parse("AAA = (BBB, CCC)")
             .into_result()
             .expect("Failed to parse connection");
         assert_eq!(
