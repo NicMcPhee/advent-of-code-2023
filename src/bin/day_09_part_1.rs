@@ -1,8 +1,27 @@
 use std::{num::ParseIntError, str::FromStr};
 
+use itertools::Itertools;
 use miette::Diagnostic;
 
 struct ValueHistory(Vec<i64>);
+
+impl ValueHistory {
+    fn predict(&self) -> i64 {
+        if self.0.iter().all_equal() {
+            return *self.0.first().unwrap();
+        }
+        let last_value = *self.0.last().unwrap();
+        let predicted_offset = Self(
+            self.0
+                .iter()
+                .tuple_windows()
+                .map(|(x, y)| y - x)
+                .collect::<Vec<_>>(),
+        )
+        .predict();
+        last_value + predicted_offset
+    }
+}
 
 #[derive(thiserror::Error, Debug, Diagnostic)]
 enum ValueHistoryParseError {
@@ -47,15 +66,15 @@ impl FromStr for Report {
 
 impl Report {
     fn predictions_total(&self) -> i64 {
-        todo!()
+        self.histories.iter().map(ValueHistory::predict).sum()
     }
 }
 
 fn main() -> miette::Result<()> {
     let input = include_str!("../inputs/day_09.txt");
-    let mut report = Report::from_str(input)?;
+    let report = Report::from_str(input)?;
     let result = report.predictions_total();
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -67,7 +86,7 @@ mod tests {
     #[test]
     fn check_test_input() {
         let input = include_str!("../inputs/day_09_test.txt");
-        let mut report = Report::from_str(input).unwrap();
+        let report = Report::from_str(input).unwrap();
         let result = report.predictions_total();
         assert_eq!(result, 114);
     }
@@ -75,8 +94,8 @@ mod tests {
     #[test]
     fn check_full_input() {
         let input = include_str!("../inputs/day_09.txt");
-        let mut report = Report::from_str(input).unwrap();
+        let report = Report::from_str(input).unwrap();
         let result = report.predictions_total();
-        assert_eq!(result, 114);
+        assert_eq!(result, 1_853_145_119);
     }
 }
