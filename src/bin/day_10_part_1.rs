@@ -1,17 +1,39 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::{num::ParseIntError, ops::BitOr, str::FromStr};
 
 use itertools::Itertools;
 use miette::Diagnostic;
+use strum::FromRepr;
 
 // TODO: Either impl bitwise OR for `Connections` or use `BitBags` which will do that for us.
 
+#[derive(FromRepr)]
 #[repr(u8)]
-enum Connections {
+enum Connection {
     Nowhere = 0b0000,
     North = 0b1000,
     East = 0b0100,
     South = 0b0010,
     West = 0b0001,
+}
+
+impl Connection {
+    fn reverse(&self) -> Self {
+        match self {
+            Connection::Nowhere => unreachable!("Should never reverse `Nowhere`"),
+            Connection::North => Self::South,
+            Connection::East => Self::West,
+            Connection::South => Self::North,
+            Connection::West => Self::East,
+        }
+    }
+}
+
+impl BitOr for Connection {
+    type Output = u8;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self as u8 | rhs as u8
+    }
 }
 
 /*
@@ -26,14 +48,36 @@ enum Connections {
 */
 #[repr(u8)]
 enum Cell {
-    NsPipe = Connections::North | Connections::South,
-    EwPipe = Connections::West | Connections::East,
-    NeBend = Connections::North | Connections::East,
-    NwBend = Connections::North | Connections::West,
-    SwBend = Connections::South | Connections::West,
-    SeBend = Connections::South | Connections::East,
-    Ground = Connections::Nowhere,
-    Start = Connections::North | Connections::South | Connections::East | Connections::West,
+    NsPipe,
+    EwPipe,
+    NeBend,
+    NwBend,
+    SwBend,
+    SeBend,
+    Ground,
+    Start,
+}
+
+struct IllegalConnectionError;
+
+impl Cell {
+    fn connections(&self) -> u8 {
+        match self {
+            Self::NsPipe => Connection::North | Connection::South,
+            Self::EwPipe => Connection::West | Connection::East,
+            Self::NeBend => Connection::North | Connection::East,
+            Self::NwBend => Connection::North | Connection::West,
+            Self::SwBend => Connection::South | Connection::West,
+            Self::SeBend => Connection::South | Connection::East,
+            Self::Ground => Connection::Nowhere as u8,
+            Self::Start => todo!(),
+        }
+    }
+
+    fn connection_from(&self, incoming: Connection) -> Result<Connection, IllegalConnectionError> {
+        Connection::from_repr(self.connections() ^ (incoming.reverse() as u8))
+            .ok_or(IllegalConnectionError)
+    }
 }
 
 struct PipeMap {
