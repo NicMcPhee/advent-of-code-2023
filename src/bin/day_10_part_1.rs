@@ -2,7 +2,7 @@ use std::{num::ParseIntError, ops::BitOr, str::FromStr};
 
 use itertools::Itertools;
 use miette::Diagnostic;
-use strum::FromRepr;
+use strum::{EnumString, FromRepr};
 
 // TODO: Either impl bitwise OR for `Connections` or use `BitBags` which will do that for us.
 
@@ -46,16 +46,25 @@ impl BitOr for Connection {
    . is ground; there is no pipe in this tile.
    S is the starting position of the animal; there is a pipe on this tile, but your sketch doesn't show what shape the pipe has.
 */
+#[derive(EnumString, FromRepr, Debug)]
 #[repr(u8)]
 enum Cell {
-    NsPipe,
-    EwPipe,
-    NeBend,
-    NwBend,
-    SwBend,
-    SeBend,
-    Ground,
-    Start,
+    #[strum(serialize = "|")]
+    NsPipe = b'|',
+    #[strum(serialize = "-")]
+    EwPipe = b'-',
+    #[strum(serialize = "L")]
+    NeBend = b'L',
+    #[strum(serialize = "J")]
+    NwBend = b'J',
+    #[strum(serialize = "7")]
+    SwBend = b'7',
+    #[strum(serialize = "F")]
+    SeBend = b'F',
+    #[strum(serialize = ".")]
+    Ground = b'.',
+    #[strum(serialize = "S")]
+    Start = b'S',
 }
 
 struct IllegalConnectionError;
@@ -80,22 +89,34 @@ impl Cell {
     }
 }
 
+#[derive(Debug)]
 struct PipeMap {
     entries: Vec<Vec<Cell>>,
 }
 
-#[derive(thiserror::Error, Debug, Diagnostic)]
-enum PipeMapParseError {
-    // #[error("Error parsing a pipe map")]
-    // #[diagnostic(transparent)]
-    // ValueHistory(#[from] ValueHistoryParseError),
-}
+// #[derive(thiserror::Error, Debug, Diagnostic)]
+// enum PipeMapParseError {
+//     // #[error("Error parsing a pipe map")]
+//     // #[diagnostic(transparent)]
+//     // ValueHistory(#[from] ValueHistoryParseError),
+// }
+
+#[derive(Debug)]
+struct PipeMapParseError;
 
 impl FromStr for PipeMap {
     type Err = PipeMapParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let entries = s
+            .lines()
+            .map(|line| {
+                line.bytes()
+                    .map(|c| Cell::from_repr(c).ok_or(PipeMapParseError))
+                    .collect::<Result<Vec<_>, PipeMapParseError>>()
+            })
+            .collect::<Result<Vec<_>, PipeMapParseError>>()?;
+        Ok(Self { entries })
     }
 }
 
@@ -105,9 +126,10 @@ impl PipeMap {
     }
 }
 
-fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_10.txt");
+fn main() -> Result<(), PipeMapParseError> {
+    let input = include_str!("../inputs/day_10_test_1.txt");
     let pipe_map = PipeMap::from_str(input)?;
+    println!("{pipe_map:#?}");
     let result = pipe_map.half_cycle_length();
     println!("Result: {result}");
 
