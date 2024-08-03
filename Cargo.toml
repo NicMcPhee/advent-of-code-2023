@@ -15,6 +15,10 @@ itertools = "0.12.1"
 fixedbitset = "0.5.1"
 rayon = "1.9.0"
 strum = { version = "0.26.2", features = ["derive"] }
+chumsky = "1.0.0-alpha.7"
+num = "0.4.3"
+miette = "7.2.0"
+thiserror = "1.0.61"
 
 [package.metadata.clippy]
 warn = ["pedantic", "nursery", "unwrap_used", "expect_used"]
