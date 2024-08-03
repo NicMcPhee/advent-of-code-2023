@@ -25,7 +25,7 @@ impl FromStr for ScratchCards {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let parts = ScratchCardsParser::parse(Rule::input, s)?.single()?;
-        Ok(ScratchCards {
+        Ok(Self {
             cards: ScratchCardsParser::input(parts).map_err(Into::into)?,
         })
     }
@@ -41,7 +41,7 @@ impl IntoIterator for ScratchCards {
 }
 
 impl ScratchCards {
-    fn num_winning_cards(&self) -> anyhow::Result<usize> {
+    fn num_winning_cards(&self) -> usize {
         let mut counts = vec![1; self.cards.len()];
         for (i, card) in self.cards.iter().enumerate().rev() {
             let num_winning_numbers = card.num_winning_numbers();
@@ -49,7 +49,7 @@ impl ScratchCards {
                 counts[i] += counts[j];
             }
         }
-        Ok(counts.iter().sum())
+        counts.iter().sum()
     }
 }
 
@@ -60,6 +60,7 @@ struct ScratchCardsParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+#[allow(clippy::unnecessary_wraps)]
 #[pest_consume::parser]
 impl ScratchCardsParser {
     fn input(input: Node) -> Result<Vec<ScratchCard>> {
@@ -95,8 +96,8 @@ impl ScratchCardsParser {
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_04_test.txt");
     let scratch_cards = ScratchCards::from_str(input)?;
-    let result = scratch_cards.num_winning_cards()?;
-    println!("Result: {}", result);
+    let result = scratch_cards.num_winning_cards();
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -109,7 +110,7 @@ mod day_04_part_1_tests {
     fn check_test_input() {
         let input = include_str!("../inputs/day_04_test.txt");
         let scratch_cards = ScratchCards::from_str(input).unwrap();
-        let result = scratch_cards.num_winning_cards().unwrap();
+        let result = scratch_cards.num_winning_cards();
         assert_eq!(result, 30);
     }
 
@@ -117,7 +118,7 @@ mod day_04_part_1_tests {
     fn check_full_input() {
         let input = include_str!("../inputs/day_04.txt");
         let scratch_cards = ScratchCards::from_str(input).unwrap();
-        let result = scratch_cards.num_winning_cards().unwrap();
-        assert_eq!(result, 6420979);
+        let result = scratch_cards.num_winning_cards();
+        assert_eq!(result, 6_420_979);
     }
 }

@@ -19,7 +19,7 @@ impl FromStr for ScratchCards {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let parts = ScratchCardsParser::parse(Rule::input, s)?.single()?;
-        Ok(ScratchCards {
+        Ok(Self {
             cards: ScratchCardsParser::input(parts).map_err(Into::into)?,
         })
     }
@@ -38,7 +38,7 @@ impl ScratchCard {
     fn sum_of_values(input: &str) -> anyhow::Result<usize> {
         Ok(ScratchCards::from_str(input)?
             .into_iter()
-            .map(ScratchCard::value)
+            .map(Self::value)
             .sum::<usize>())
     }
 
@@ -47,6 +47,7 @@ impl ScratchCard {
         if num_winning_numbers == 0 {
             0
         } else {
+            #[allow(clippy::cast_possible_truncation)]
             2usize.pow(num_winning_numbers as u32 - 1)
         }
     }
@@ -59,6 +60,7 @@ struct ScratchCardsParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+#[allow(clippy::unnecessary_wraps)]
 #[pest_consume::parser]
 impl ScratchCardsParser {
     fn input(input: Node) -> Result<Vec<ScratchCard>> {
@@ -94,7 +96,7 @@ impl ScratchCardsParser {
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_04.txt");
     let result = ScratchCard::sum_of_values(input)?;
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }

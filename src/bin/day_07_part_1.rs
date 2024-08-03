@@ -26,7 +26,7 @@ impl TryFrom<char> for Card {
 
     fn try_from(c: char) -> Result<Self, Self::Error> {
         Ok(match c {
-            c @ '2'..='9' => Card::from_repr(c as u8 - b'0').unwrap(),
+            c @ '2'..='9' => Self::from_repr(c as u8 - b'0').unwrap(),
             'T' => Self::Ten,
             'J' => Self::Jack,
             'Q' => Self::Queen,
@@ -64,7 +64,7 @@ struct Hand {
 
 impl Hand {
     pub fn new(cards: [Card; 5]) -> Self {
-        Hand {
+        Self {
             hand_type: Self::classify_hand(&cards),
             cards,
         }
@@ -103,7 +103,7 @@ impl FromStr for Round {
             .chars()
             .map(Card::try_from)
             .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(Round {
+        Ok(Self {
             hand: Hand::new(cards.try_into().map_err(|v| {
                 anyhow::anyhow!("Failed to convert {v:#?} to an array of 5 `Card`s")
             })?),
@@ -125,13 +125,14 @@ impl FromStr for Game {
             .lines()
             .map(Round::from_str)
             .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(Game { rounds })
+        Ok(Self { rounds })
     }
 }
 
 impl Game {
     pub fn total_winnings(&mut self) -> u32 {
         self.rounds.sort();
+        #[allow(clippy::cast_possible_truncation)]
         self.rounds
             .iter()
             .enumerate()
@@ -144,7 +145,7 @@ fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_07.txt");
     let mut game = Game::from_str(input)?;
     let result = game.total_winnings();
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -166,6 +167,6 @@ mod day_07_part_1_tests {
         let input = include_str!("../inputs/day_07.txt");
         let mut game = Game::from_str(input).unwrap();
         let result = game.total_winnings();
-        assert_eq!(result, 248836197);
+        assert_eq!(result, 248_836_197);
     }
 }

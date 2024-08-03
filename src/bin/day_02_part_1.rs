@@ -15,7 +15,7 @@ struct Reveal {
 }
 
 impl Reveal {
-    fn within(&self, max_count: &Reveal) -> bool {
+    const fn within(&self, max_count: &Self) -> bool {
         self.red <= max_count.red && self.green <= max_count.green && self.blue <= max_count.blue
     }
 }
@@ -34,7 +34,7 @@ impl FromIterator<CubeCount> for Reveal {
                 Color::Blue => blue += count,
             }
         }
-        Reveal { red, green, blue }
+        Self { red, green, blue }
     }
 }
 
@@ -51,6 +51,7 @@ struct GameParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+#[allow(clippy::unnecessary_wraps)]
 #[pest_consume::parser]
 impl GameParser {
     fn input(input: Node) -> Result<Vec<Game>> {
