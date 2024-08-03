@@ -222,10 +222,10 @@ mod day_08_part_1_tests {
 
     #[test]
     fn check_test_input_1() {
-        let input = include_str!("../inputs/day_08_test_3.txt");
+        let input = include_str!("../inputs/day_08_test_1.txt");
         let map = parser().parse(input).into_result().unwrap();
         let result = map.num_steps();
-        assert_eq!(result, 6);
+        assert_eq!(result, 2);
     }
 
     #[test]
