@@ -60,6 +60,7 @@ struct ScratchCardsParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+#[allow(clippy::unnecessary_wraps)]
 #[pest_consume::parser]
 impl ScratchCardsParser {
     fn input(input: Node) -> Result<Vec<ScratchCard>> {
