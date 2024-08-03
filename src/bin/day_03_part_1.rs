@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use pest::error::ErrorVariant;
 use pest_consume::{match_nodes, Error, Parser};
 
 #[derive(Debug)]
@@ -28,6 +29,7 @@ impl Part {
 
 #[derive(Debug)]
 struct Symbol {
+    #[allow(clippy::struct_field_names)]
     symbol: char,
     line: usize,
     column: usize,
@@ -76,7 +78,7 @@ impl FromIterator<Cell> for Schematic {
                 }
             }
         }
-        Schematic { parts, symbols }
+        Self { parts, symbols }
     }
 }
 
@@ -87,6 +89,7 @@ struct SchematicParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+#[allow(clippy::unnecessary_wraps)]
 #[pest_consume::parser]
 impl SchematicParser {
     fn input(input: Node) -> Result<Schematic> {
@@ -103,11 +106,15 @@ impl SchematicParser {
     }
 
     fn number(input: Node) -> Result<Part> {
-        let number = input
-            .as_str()
-            .parse()
-            .expect("A part number must be a valid unsigned integer.");
         let span = input.as_span();
+        let number = input.as_str().parse().map_err(|e| {
+            Error::new_from_span(
+                ErrorVariant::CustomError {
+                    message: format!("ParseIntError: {e}"),
+                },
+                span,
+            )
+        })?;
         let (line, start) = span.start_pos().line_col();
         let (_, end) = span.end_pos().line_col();
         Ok(Part {
@@ -119,12 +126,15 @@ impl SchematicParser {
     }
 
     fn symbol(input: Node) -> Result<Symbol> {
-        let symbol = input
-            .as_str()
-            .chars()
-            .next()
-            .expect("A symbol must be a single character.");
         let span = input.as_span();
+        let symbol = input.as_str().chars().next().ok_or_else(|| {
+            Error::new_from_span(
+                ErrorVariant::CustomError {
+                    message: format!("Symbol must be single character: {}", input.as_str()),
+                },
+                span,
+            )
+        })?;
         let (line, column) = span.start_pos().line_col();
         Ok(Symbol {
             symbol,
@@ -143,7 +153,7 @@ fn parse_schematic(input: &str) -> anyhow::Result<Schematic> {
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_03.txt");
     let result = parse_schematic(input)?.sum_of_part_numbers();
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -163,6 +173,6 @@ mod tests {
     fn check_full_input() {
         let input = include_str!("../inputs/day_03.txt");
         let result = parse_schematic(input).unwrap().sum_of_part_numbers();
-        assert_eq!(result, 498559);
+        assert_eq!(result, 498_559);
     }
 }

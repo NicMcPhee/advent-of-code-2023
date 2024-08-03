@@ -59,6 +59,7 @@ impl RangeMapping {
         if !self.range.contains(&value) {
             return None;
         }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)]
         Some((value as i64 + self.offset) as u64)
     }
 }
@@ -79,6 +80,7 @@ struct AlmanacParser;
 type Result<T> = std::result::Result<T, Error<Rule>>;
 type Node<'i> = pest_consume::Node<'i, Rule, ()>;
 
+#[allow(clippy::unnecessary_wraps)]
 #[pest_consume::parser]
 impl AlmanacParser {
     fn input(input: Node) -> Result<Almanac> {
@@ -116,6 +118,7 @@ impl AlmanacParser {
         Ok(match_nodes! { input.into_children();
             [number(dest_start), number(source_start), number(length)] => RangeMapping {
                 range: source_start..source_start +length,
+                #[allow(clippy::cast_possible_wrap)]
                 offset: dest_start as i64 - source_start as i64,
             },
         })
@@ -149,7 +152,7 @@ fn main() -> anyhow::Result<()> {
     let input = include_str!("../inputs/day_05.txt");
     let almanac = Almanac::from_str(input)?;
     let result = almanac.lowest_location().expect("No location found");
-    println!("Result: {}", result);
+    println!("Result: {result}");
 
     Ok(())
 }
@@ -171,6 +174,6 @@ mod day_05_part_1_tests {
         let input = include_str!("../inputs/day_05.txt");
         let almanac = Almanac::from_str(input).unwrap();
         let result = almanac.lowest_location().unwrap();
-        assert_eq!(result, 88151870);
+        assert_eq!(result, 88_151_870);
     }
 }
