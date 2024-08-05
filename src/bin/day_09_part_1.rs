@@ -59,7 +59,7 @@ impl FromStr for Report {
         let histories = s
             .lines()
             .map(ValueHistory::from_str)
-            .collect::<Result<Vec<_>, ValueHistoryParseError>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Self { histories })
     }
 }
