@@ -268,7 +268,6 @@ enum PipeMapError {
 impl PipeMap {
     fn start_cell(&self) -> Result<Cell, PipeMapError> {
         self.get(self.start)
-            .map_err(|_| PipeMapError::IllegalPos(self.start))
     }
 
     fn starting_options(&self) -> Result<(Cell, Vec<Connection>), PipeMapError> {
@@ -283,7 +282,7 @@ impl PipeMap {
                 .and_then(|cell| {
                     cell.cell_type
                         .connection_from(*c)
-                        .map_err(PipeMapError::ConnectionError)
+                        .map_err(PipeMapError::from)
                 })
                 .is_ok()
             })
