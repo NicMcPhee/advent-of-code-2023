@@ -1,3 +1,4 @@
+use miette::{Diagnostic, SourceSpan};
 use std::fmt::Display;
 use std::{
     ops::{Add, BitOr},
@@ -5,10 +6,14 @@ use std::{
 };
 use strum::{EnumIter, EnumString, FromRepr, IntoEnumIterator};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Diagnostic)]
 enum ConnectionError {
-    #[error("Too many bits for a single connection")]
-    TooManyBits,
+    #[error("Too many bits for a single connection: {0:b}")]
+    #[diagnostic(
+        code(day10::connection_error),
+        help("Binary pattern passed to `from_bits()` must have a single `1` bit")
+    )]
+    TooManyBits(u8),
 }
 
 #[derive(Debug, strum::Display, FromRepr, EnumIter, Clone, Copy)]
@@ -37,7 +42,7 @@ impl Connection {
     /// Return `ConnectionError::TooManyBits` if `bits` doesn't represent
     /// a (single) connection.
     fn from_bits(bits: u8) -> Result<Self, ConnectionError> {
-        Self::from_repr(bits).ok_or(ConnectionError::TooManyBits)
+        Self::from_repr(bits).ok_or(ConnectionError::TooManyBits(bits))
     }
 }
 
@@ -205,11 +210,29 @@ struct PipeMap {
     start: Pos,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Diagnostic)]
+#[error("Illegal character in pipe map on row {row_number:?}")]
+#[diagnostic(
+    code(day_10::illegal_character),
+    help("All pipe map characters have to be from set \"|-LJ7F.S\"")
+)]
+struct IllegalCharacterError {
+    #[source_code]
+    src: String,
+
+    row_number: usize,
+
+    #[label("Illegal character")]
+    location: SourceSpan,
+}
+
+#[derive(Debug, thiserror::Error, Diagnostic)]
 enum PipeMapParseError {
-    #[error("An illegal character {0} in a pipe map")]
-    IllegalCharacter(char),
+    #[error("Illegal character while parsing pipe map")]
+    #[diagnostic(transparent)]
+    IllegalCharacter(#[from] IllegalCharacterError),
     #[error("No start symbol was found in the pipe map")]
+    #[diagnostic(code(day_10::no_start_symbol))]
     NoStartSymbol,
 }
 
@@ -230,9 +253,16 @@ impl FromStr for PipeMap {
                             start_row = Some(row_number);
                             start_col = Some(col_number);
                         };
-                        let cell_type = CellType::from_repr(c)
-                            .ok_or(PipeMapParseError::IllegalCharacter(c as char))?;
-                        Ok(Cell::new_from_coords(cell_type, row_number, col_number))
+                        let cell_type = CellType::from_repr(c).ok_or_else(|| {
+                            PipeMapParseError::from(IllegalCharacterError {
+                                src: line.to_string(),
+                                row_number,
+                                location: SourceSpan::new(col_number.into(), 1),
+                            })
+                        })?;
+                        Ok::<Cell, PipeMapParseError>(Cell::new_from_coords(
+                            cell_type, row_number, col_number,
+                        ))
                     })
                     .collect::<Result<Vec<_>, _>>()
             })
@@ -253,15 +283,17 @@ impl Display for IncorrectOptions {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Diagnostic)]
 enum PipeMapError {
     #[error(transparent)]
+    #[diagnostic(transparent)]
     ParseError(#[from] PipeMapParseError),
     #[error("Attempt to access an illegal `Pos` {0} in `PipeMap")]
     IllegalPos(Pos),
     #[error("Not two options from start: {0}")]
     NotTwoOptionsFromStart(IncorrectOptions),
-    #[error(transparent)]
+    #[error("Illegal connection in pipe map")]
+    #[diagnostic(transparent)]
     ConnectionError(#[from] ConnectionError),
 }
 
@@ -330,7 +362,14 @@ impl PipeMap {
     }
 }
 
-fn main() -> Result<(), PipeMapError> {
+fn main() -> miette::Result<()> {
+    // let connection = Connection::from_bits(0b10110)?;
+    // println!("Printing the connection: {connection}");
+
+    // let map_str = "F7-\n|S7\n-x-";
+    // let failed_map = PipeMap::from_str(map_str)?;
+    // println!("{failed_map:?}");
+
     let input = include_str!("../inputs/day_10.txt");
     let pipe_map = PipeMap::from_str(input)?;
     // println!("{pipe_map:#?}");
