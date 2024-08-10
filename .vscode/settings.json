@@ -2,8 +2,10 @@
     "cSpell.words": [
         "Fluegel",
         "Justus",
+        "miette",
         "Mizard",
         "repr",
-        "struct"
+        "struct",
+        "thiserror"
     ]
 }
