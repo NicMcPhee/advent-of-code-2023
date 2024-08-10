@@ -199,10 +199,6 @@ impl Cell {
     pub const fn new_from_coords(cell_type: CellType, row: usize, col: usize) -> Self {
         Self::new(cell_type, Pos::new(row, col))
     }
-
-    pub const fn empty(pos: Pos) -> Self {
-        Self::new(CellType::Ground, pos)
-    }
 }
 
 #[derive(Debug)]
