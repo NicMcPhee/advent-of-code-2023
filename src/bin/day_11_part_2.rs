@@ -24,6 +24,8 @@ struct GalaxyMap {
     galaxies: Vec<Galaxy>,
 }
 
+const EXPANSION_RATE: usize = 1_000_000;
+
 impl GalaxyMap {
     fn parse_and_adjust(s: &str) -> Result<Self, GalaxyMapError> {
         let galaxy_map: Self = s.parse()?;
@@ -36,8 +38,9 @@ impl GalaxyMap {
             galaxies[i].row += offset;
             let diff = galaxies[i].row - galaxies[i - 1].row;
             if diff > 1 {
-                offset += diff - 1;
-                galaxies[i].row += diff - 1;
+                let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
+                offset += additional_offset;
+                galaxies[i].row += additional_offset;
             }
         }
 
@@ -48,8 +51,9 @@ impl GalaxyMap {
             galaxies[i].col += offset;
             let diff = galaxies[i].col - galaxies[i - 1].col;
             if diff > 1 {
-                offset += diff - 1;
-                galaxies[i].col += diff - 1;
+                let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
+                offset += additional_offset;
+                galaxies[i].col += additional_offset;
             }
         }
 
