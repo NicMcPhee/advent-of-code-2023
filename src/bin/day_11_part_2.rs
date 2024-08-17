@@ -3,7 +3,7 @@ use std::str::FromStr;
 use itertools::Itertools;
 use miette::Diagnostic;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Galaxy {
     row: usize,
     col: usize,
@@ -31,33 +31,46 @@ impl GalaxyMap {
         let galaxy_map: Self = s.parse()?;
         let mut galaxies = galaxy_map.galaxies;
 
-        // Sort galaxies by x-coordinate
-        galaxies.sort_unstable_by_key(|galaxy| galaxy.row);
-        let mut offset = 0;
-        for i in 1..galaxies.len() {
-            galaxies[i].row += offset;
-            let diff = galaxies[i].row - galaxies[i - 1].row;
-            if diff > 1 {
-                let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
-                offset += additional_offset;
-                galaxies[i].row += additional_offset;
-            }
-        }
+        Self::offset_elements(&mut galaxies, |galaxy| galaxy.row, &mut |galaxy| {
+            &mut galaxy.row
+        });
 
-        // Sort galaxies by y-coordinate
-        galaxies.sort_unstable_by_key(|galaxy| galaxy.col);
-        let mut offset = 0;
-        for i in 1..galaxies.len() {
-            galaxies[i].col += offset;
-            let diff = galaxies[i].col - galaxies[i - 1].col;
-            if diff > 1 {
-                let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
-                offset += additional_offset;
-                galaxies[i].col += additional_offset;
-            }
-        }
+        Self::offset_elements(&mut galaxies, |galaxy| galaxy.col, &mut |galaxy| {
+            &mut galaxy.col
+        });
+
+        // // Sort galaxies by y-coordinate
+        // galaxies.sort_unstable_by_key(|galaxy| galaxy.col);
+        // let mut offset = 0;
+        // for i in 1..galaxies.len() {
+        //     galaxies[i].col += offset;
+        //     let diff = galaxies[i].col - galaxies[i - 1].col;
+        //     if diff > 1 {
+        //         let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
+        //         offset += additional_offset;
+        //         galaxies[i].col += additional_offset;
+        //     }
+        // }
 
         Ok(Self { galaxies })
+    }
+
+    fn offset_elements(
+        galaxies: &mut [Galaxy],
+        get_coord: impl Fn(Galaxy) -> usize,
+        get_coord_mut: &mut impl FnMut(&mut Galaxy) -> &mut usize,
+    ) {
+        galaxies.sort_unstable_by_key(|galaxy| get_coord(*galaxy));
+        let mut offset = 0;
+        for i in 1..galaxies.len() {
+            *get_coord_mut(&mut galaxies[i]) += offset;
+            let diff = *get_coord_mut(&mut galaxies[i]) - *get_coord_mut(&mut galaxies[i - 1]);
+            if diff > 1 {
+                let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
+                offset += additional_offset;
+                *get_coord_mut(&mut galaxies[i]) += additional_offset;
+            }
+        }
     }
 
     fn pairwise_length_sum(&self) -> usize {
@@ -108,7 +121,7 @@ mod tests {
         let input = include_str!("../inputs/day_11_test.txt");
         let galaxy_map = GalaxyMap::parse_and_adjust(input)?; // .unwrap();
         let result = galaxy_map.pairwise_length_sum(); // .unwrap();
-        assert_eq!(result, 374);
+        assert_eq!(result, 82_000_210);
         Ok(())
     }
 
@@ -117,6 +130,6 @@ mod tests {
         let input = include_str!("../inputs/day_11.txt");
         let galaxy_map = GalaxyMap::parse_and_adjust(input).unwrap();
         let result = galaxy_map.pairwise_length_sum();
-        assert_eq!(result, 10_885_634);
+        assert_eq!(result, 707_505_470_642);
     }
 }
