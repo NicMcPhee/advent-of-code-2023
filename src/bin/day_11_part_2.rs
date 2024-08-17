@@ -1,12 +1,41 @@
-use std::str::FromStr;
+use std::{
+    ops::{Index, IndexMut},
+    str::FromStr,
+};
 
 use itertools::Itertools;
 use miette::Diagnostic;
 
 #[derive(Debug, Clone, Copy)]
+enum Axis {
+    Row,
+    Col,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct Galaxy {
     row: usize,
     col: usize,
+}
+
+impl Index<Axis> for Galaxy {
+    type Output = usize;
+
+    fn index(&self, index: Axis) -> &Self::Output {
+        match index {
+            Axis::Row => &self.row,
+            Axis::Col => &self.col,
+        }
+    }
+}
+
+impl IndexMut<Axis> for Galaxy {
+    fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
+        match index {
+            Axis::Row => &mut self.row,
+            Axis::Col => &mut self.col,
+        }
+    }
 }
 
 impl Galaxy {
@@ -31,44 +60,24 @@ impl GalaxyMap {
         let galaxy_map: Self = s.parse()?;
         let mut galaxies = galaxy_map.galaxies;
 
-        Self::offset_elements(&mut galaxies, |galaxy| galaxy.row, &mut |galaxy| {
-            &mut galaxy.row
-        });
-
-        Self::offset_elements(&mut galaxies, |galaxy| galaxy.col, &mut |galaxy| {
-            &mut galaxy.col
-        });
-
-        // // Sort galaxies by y-coordinate
-        // galaxies.sort_unstable_by_key(|galaxy| galaxy.col);
-        // let mut offset = 0;
-        // for i in 1..galaxies.len() {
-        //     galaxies[i].col += offset;
-        //     let diff = galaxies[i].col - galaxies[i - 1].col;
-        //     if diff > 1 {
-        //         let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
-        //         offset += additional_offset;
-        //         galaxies[i].col += additional_offset;
-        //     }
-        // }
+        // Process blank rows
+        Self::offset_elements(&mut galaxies, Axis::Row);
+        // Process blank columns
+        Self::offset_elements(&mut galaxies, Axis::Col);
 
         Ok(Self { galaxies })
     }
 
-    fn offset_elements(
-        galaxies: &mut [Galaxy],
-        get_coord: impl Fn(Galaxy) -> usize,
-        get_coord_mut: &mut impl FnMut(&mut Galaxy) -> &mut usize,
-    ) {
-        galaxies.sort_unstable_by_key(|galaxy| get_coord(*galaxy));
+    fn offset_elements(galaxies: &mut [Galaxy], axis: Axis) {
+        galaxies.sort_unstable_by_key(|galaxy| galaxy[axis]);
         let mut offset = 0;
         for i in 1..galaxies.len() {
-            *get_coord_mut(&mut galaxies[i]) += offset;
-            let diff = *get_coord_mut(&mut galaxies[i]) - *get_coord_mut(&mut galaxies[i - 1]);
+            galaxies[i][axis] += offset;
+            let diff = galaxies[i][axis] - galaxies[i - 1][axis];
             if diff > 1 {
                 let additional_offset = (diff - 1) * (EXPANSION_RATE - 1);
                 offset += additional_offset;
-                *get_coord_mut(&mut galaxies[i]) += additional_offset;
+                galaxies[i][axis] += additional_offset;
             }
         }
     }
