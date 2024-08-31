@@ -1,6 +1,7 @@
 use std::{num::ParseIntError, str::FromStr};
 
 use miette::Diagnostic;
+use tracing::instrument;
 
 #[derive(Debug, thiserror::Error, Diagnostic)]
 enum ConditionRecordsError {
@@ -39,6 +40,7 @@ struct ConditionRecord {
 }
 
 impl ConditionRecord {
+    #[instrument(ret)]
     fn num_arrangements(&self) -> usize {
         self.count_arrangements(0, 0, 0)
     }
@@ -60,7 +62,7 @@ impl ConditionRecord {
             // matches the expected number of broken springs, and we're at the last block,
             // we have satisfied the pattern and can return 1.
             None if current_count == broken_count && counts_pos >= self.counts.len() - 1 => {
-                return 1
+                return 1;
             }
             // We've exhausted the pattern, and either number of broken springs in this block
             // doesn't match the expected number of broken springs, or we still have additional
@@ -165,6 +167,7 @@ mod tests {
     #[test_case("? 0", 1 ; "single question mark with zero")]
     #[test_case("? 1", 1 ; "single question mark with one")]
     fn base_cases(input: &'static str, expected: usize) -> Result<(), ConditionRecordsError> {
+        tracing_subscriber::fmt().pretty().init();
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
         assert_eq!(result, expected);
@@ -173,6 +176,7 @@ mod tests {
 
     #[test]
     fn check_test_input() -> Result<(), ConditionRecordsError> {
+        tracing_subscriber::fmt().pretty().init();
         let input = include_str!("../inputs/day_12_test.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
@@ -182,6 +186,7 @@ mod tests {
 
     #[test]
     fn check_full_input() -> Result<(), ConditionRecordsError> {
+        tracing_subscriber::fmt().pretty().init();
         let input = include_str!("../inputs/day_12.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
