@@ -40,7 +40,6 @@ struct ConditionRecord {
 
 impl ConditionRecord {
     fn num_arrangements(&self) -> usize {
-        println!("About to count arrangements for {self:#?}");
         self.count_arrangements(0, 0, 0)
     }
 
@@ -50,7 +49,6 @@ impl ConditionRecord {
         counts_pos: usize,
         broken_count: usize,
     ) -> usize {
-        println!("{pattern_pos:^3}, {counts_pos:^3}, {broken_count:^3}");
         // We've reached the end of the counts, but possibly still have patterns to check.
         // We'll set the current_count (the expected number of broken springs) to 0 since
         // we've exhausted the counts in `self.counts`. If we see any more broken springs,
@@ -58,12 +56,16 @@ impl ConditionRecord {
         let current_count = self.counts.get(counts_pos).copied().unwrap_or(0);
         let status = match self.pattern.get(pattern_pos) {
             Some(status) => status,
-            // We've exhausted the pattern, but were expecting at least one more broken spring,
-            // so this branch "fails" and we return 0.
-            None if current_count > 0 => return dbg!(0),
-            // We've exhausted the pattern and aren't expecting any more broken springs, so
-            // this part of this branch is successful and we return 1.
-            None => return dbg!(1),
+            // We've exhausted the pattern, the number of broken springs in this block
+            // matches the expected number of broken springs, and we're at the last block,
+            // we have satisfied the pattern and can return 1.
+            None if current_count == broken_count && counts_pos >= self.counts.len() - 1 => {
+                return 1
+            }
+            // We've exhausted the pattern, and either number of broken springs in this block
+            // doesn't match the expected number of broken springs, or we still have additional
+            // blocks to satisfy, so we return 0.
+            None => return 0,
         };
         let broken_path = match status {
             // Adding this broken spring exceeds the expected number in this group,
@@ -89,7 +91,6 @@ impl ConditionRecord {
             ),
             Status::Broken => 0,
         };
-        println!("{pattern_pos:^3}, {counts_pos:^3}, {broken_count:^3}, -> {broken_path:^3} + {working_path:^3}");
         broken_path + working_path
     }
 }
@@ -144,9 +145,9 @@ impl FromStr for ConditionRecords {
 }
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_12_test.txt");
+    let input = include_str!("../inputs/day_12.txt");
     let condition_records: ConditionRecords = input.parse()?;
-    println!("{condition_records:#?}");
+    // println!("{condition_records:#?}");
     let result = condition_records.num_arrangements();
     println!("Result: {result}");
 
@@ -172,6 +173,15 @@ mod tests {
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
         assert_eq!(result, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn check_double_hash() -> Result<(), ConditionRecordsError> {
+        let input = "# 1,1";
+        let condition_records: ConditionRecords = input.parse()?;
+        let result = condition_records.num_arrangements();
+        assert_eq!(result, 0);
         Ok(())
     }
 
@@ -207,7 +217,7 @@ mod tests {
         let input = include_str!("../inputs/day_12.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
-        assert_eq!(result, 10_885_634);
+        assert_eq!(result, 7718);
         Ok(())
     }
 }
