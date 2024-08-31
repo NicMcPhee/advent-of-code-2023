@@ -1,6 +1,9 @@
-use std::{num::ParseIntError, str::FromStr};
+use std::{iter::repeat, num::ParseIntError, str::FromStr};
 
+use itertools::Itertools;
+use memoize::memoize;
 use miette::Diagnostic;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use tracing::instrument;
 
 #[derive(Debug, thiserror::Error, Diagnostic)]
@@ -46,6 +49,7 @@ impl ConditionRecord {
     }
 
     // #[instrument(ret)]
+    // #[memoize]
     fn count_arrangements(
         &self,
         pattern_pos: usize,
@@ -105,15 +109,25 @@ impl FromStr for ConditionRecord {
         let (pattern_chars, counts_chars) = line
             .split_once(' ')
             .ok_or_else(|| Self::Err::NoSpace(line.to_string()))?;
-        let pattern: Vec<Status> = pattern_chars
+        let original_pattern: Vec<Status> = pattern_chars
             .chars()
             .map(TryInto::try_into)
             .collect::<Result<_, _>>()?;
-        let counts: Vec<usize> = counts_chars
+        let repeated_pattern = itertools::Itertools::intersperse(
+            repeat(original_pattern).take(5),
+            vec![Status::Unknown],
+        )
+        .flatten()
+        .collect();
+        let original_counts: Vec<usize> = counts_chars
             .split(',')
             .map(str::parse)
             .collect::<Result<_, _>>()?;
-        Ok(Self { pattern, counts })
+        let repeated_counts = repeat(original_counts).take(5).flatten().collect();
+        Ok(Self {
+            pattern: repeated_pattern,
+            counts: repeated_counts,
+        })
     }
 }
 
@@ -125,8 +139,12 @@ struct ConditionRecords {
 impl ConditionRecords {
     fn num_arrangements(&self) -> usize {
         self.records
-            .iter()
-            .map(ConditionRecord::num_arrangements)
+            .par_iter()
+            .enumerate()
+            .map(|(index, cr)| {
+                println!("{}/{}", index + 1, self.records.len());
+                cr.num_arrangements()
+            })
             .sum()
     }
 }
