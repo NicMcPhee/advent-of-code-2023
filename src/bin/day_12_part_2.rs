@@ -1,9 +1,8 @@
-use std::{iter::repeat, num::ParseIntError, str::FromStr};
+use std::{iter::repeat, num::ParseIntError, str::FromStr, sync::atomic::AtomicUsize};
 
-use itertools::Itertools;
 use memoize::memoize;
 use miette::Diagnostic;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tracing::instrument;
 
 #[derive(Debug, thiserror::Error, Diagnostic)]
@@ -138,12 +137,14 @@ struct ConditionRecords {
 
 impl ConditionRecords {
     fn num_arrangements(&self) -> usize {
+        let num_completed = AtomicUsize::new(0);
         self.records
             .par_iter()
-            .enumerate()
-            .map(|(index, cr)| {
-                println!("{}/{}", index + 1, self.records.len());
-                cr.num_arrangements()
+            .map(|cr| {
+                let result = cr.num_arrangements();
+                num_completed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                println!("{num_completed:?}/{} => {result}", self.records.len());
+                result
             })
             .sum()
     }
