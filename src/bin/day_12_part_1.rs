@@ -45,6 +45,7 @@ impl ConditionRecord {
         self.count_arrangements(0, 0, 0)
     }
 
+    // #[instrument(ret)]
     fn count_arrangements(
         &self,
         pattern_pos: usize,
@@ -160,23 +161,24 @@ fn main() -> miette::Result<()> {
 mod tests {
     use super::*;
     use test_case::test_case;
+    use tracing_test::traced_test;
 
+    #[traced_test]
     #[test_case(". 0", 1 ; "single dot")]
     #[test_case("# 1",  1  ; "single hash")]
     #[test_case("# 1,1", 0 ; "single hash with two counts")]
     #[test_case("? 0", 1 ; "single question mark with zero")]
     #[test_case("? 1", 1 ; "single question mark with one")]
     fn base_cases(input: &'static str, expected: usize) -> Result<(), ConditionRecordsError> {
-        tracing_subscriber::fmt().pretty().init();
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
         assert_eq!(result, expected);
         Ok(())
     }
 
+    #[traced_test]
     #[test]
     fn check_test_input() -> Result<(), ConditionRecordsError> {
-        tracing_subscriber::fmt().pretty().init();
         let input = include_str!("../inputs/day_12_test.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
@@ -184,9 +186,9 @@ mod tests {
         Ok(())
     }
 
+    #[traced_test]
     #[test]
     fn check_full_input() -> Result<(), ConditionRecordsError> {
-        tracing_subscriber::fmt().pretty().init();
         let input = include_str!("../inputs/day_12.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
