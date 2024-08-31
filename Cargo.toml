@@ -19,6 +19,7 @@ chumsky = "1.0.0-alpha.7"
 num = "0.4.3"
 miette = { version = "7.2.0", features = ["fancy"] }
 thiserror = "1.0.61"
+test-case = "3.3.1"
 
 [package.metadata.clippy]
 warn = ["pedantic", "nursery", "unwrap_used", "expect_used"]

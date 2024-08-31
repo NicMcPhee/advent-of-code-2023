@@ -157,49 +157,17 @@ fn main() -> miette::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
-    #[test]
-    fn check_single_dot() -> Result<(), ConditionRecordsError> {
-        let input = ". 0";
+    #[test_case(". 0", 1 ; "single dot")]
+    #[test_case("# 1",  1  ; "single hash")]
+    #[test_case("# 1,1", 0 ; "single hash with two counts")]
+    #[test_case("? 0", 1 ; "single question mark with zero")]
+    #[test_case("? 1", 1 ; "single question mark with one")]
+    fn base_cases(input: &'static str, expected: usize) -> Result<(), ConditionRecordsError> {
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
-        assert_eq!(result, 1);
-        Ok(())
-    }
-
-    #[test]
-    fn check_single_hash() -> Result<(), ConditionRecordsError> {
-        let input = "# 1";
-        let condition_records: ConditionRecords = input.parse()?;
-        let result = condition_records.num_arrangements();
-        assert_eq!(result, 1);
-        Ok(())
-    }
-
-    #[test]
-    fn check_double_hash() -> Result<(), ConditionRecordsError> {
-        let input = "# 1,1";
-        let condition_records: ConditionRecords = input.parse()?;
-        let result = condition_records.num_arrangements();
-        assert_eq!(result, 0);
-        Ok(())
-    }
-
-    #[test]
-    fn check_single_question_zero() -> Result<(), ConditionRecordsError> {
-        let input = "? 0";
-        let condition_records: ConditionRecords = input.parse()?;
-        let result = condition_records.num_arrangements();
-        assert_eq!(result, 1);
-        Ok(())
-    }
-
-    #[test]
-    fn check_single_question_one() -> Result<(), ConditionRecordsError> {
-        let input = "? 1";
-        let condition_records: ConditionRecords = input.parse()?;
-        let result = condition_records.num_arrangements();
-        assert_eq!(result, 1);
+        assert_eq!(result, expected);
         Ok(())
     }
 
