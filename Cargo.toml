@@ -24,6 +24,7 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 tracing-test = "0.2.5"
 memoize = "0.4.2"
+ndarray = "0.16.1"
 
 [package.metadata.clippy]
 warn = ["pedantic", "nursery", "unwrap_used", "expect_used"]
