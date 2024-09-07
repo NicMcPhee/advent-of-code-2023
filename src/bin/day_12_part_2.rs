@@ -1,6 +1,7 @@
-use std::{iter::repeat, num::ParseIntError, str::FromStr, sync::atomic::AtomicUsize};
+use std::{
+    collections::HashMap, iter::repeat, num::ParseIntError, str::FromStr, sync::atomic::AtomicUsize,
+};
 
-use memoize::memoize;
 use miette::Diagnostic;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tracing::instrument;
@@ -44,16 +45,31 @@ struct ConditionRecord {
 impl ConditionRecord {
     #[instrument(ret)]
     fn num_arrangements(&self) -> usize {
-        self.count_arrangements(0, 0, 0)
+        let mut cache: HashMap<(usize, usize, usize), usize> = HashMap::new();
+        self.count_arrangements_cached(0, 0, 0, &mut cache)
     }
 
-    // #[instrument(ret)]
-    // #[memoize]
+    fn count_arrangements_cached(
+        &self,
+        pattern_pos: usize,
+        counts_pos: usize,
+        broken_count: usize,
+        cache: &mut HashMap<(usize, usize, usize), usize>,
+    ) -> usize {
+        if let Some(&result) = cache.get(&(pattern_pos, counts_pos, broken_count)) {
+            return result;
+        }
+        let result = self.count_arrangements(pattern_pos, counts_pos, broken_count, cache);
+        cache.insert((pattern_pos, counts_pos, broken_count), result);
+        result
+    }
+
     fn count_arrangements(
         &self,
         pattern_pos: usize,
         counts_pos: usize,
         broken_count: usize,
+        cache: &mut HashMap<(usize, usize, usize), usize>,
     ) -> usize {
         // We've reached the end of the counts, but possibly still have patterns to check.
         // We'll set the current_count (the expected number of broken springs) to 0 since
@@ -78,7 +94,7 @@ impl ConditionRecord {
             // so this branch "fails" and we return 0.
             Status::Broken | Status::Unknown if broken_count + 1 > current_count => 0,
             Status::Broken | Status::Unknown => {
-                self.count_arrangements(pattern_pos + 1, counts_pos, broken_count + 1)
+                self.count_arrangements_cached(pattern_pos + 1, counts_pos, broken_count + 1, cache)
             }
             Status::Working => 0,
         };
@@ -90,10 +106,11 @@ impl ConditionRecord {
             {
                 0
             }
-            Status::Working | Status::Unknown => self.count_arrangements(
+            Status::Working | Status::Unknown => self.count_arrangements_cached(
                 pattern_pos + 1,
                 counts_pos + usize::from(broken_count > 0),
                 0,
+                cache,
             ),
             Status::Broken => 0,
         };
@@ -142,7 +159,7 @@ impl ConditionRecords {
             .par_iter()
             .map(|cr| {
                 let result = cr.num_arrangements();
-                num_completed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                num_completed.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
                 println!("{num_completed:?}/{} => {result}", self.records.len());
                 result
             })
@@ -179,21 +196,7 @@ fn main() -> miette::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_case::test_case;
     use tracing_test::traced_test;
-
-    #[traced_test]
-    #[test_case(". 0", 1 ; "single dot")]
-    #[test_case("# 1",  1  ; "single hash")]
-    #[test_case("# 1,1", 0 ; "single hash with two counts")]
-    #[test_case("? 0", 1 ; "single question mark with zero")]
-    #[test_case("? 1", 1 ; "single question mark with one")]
-    fn base_cases(input: &'static str, expected: usize) -> Result<(), ConditionRecordsError> {
-        let condition_records: ConditionRecords = input.parse()?;
-        let result = condition_records.num_arrangements();
-        assert_eq!(result, expected);
-        Ok(())
-    }
 
     #[traced_test]
     #[test]
@@ -201,7 +204,7 @@ mod tests {
         let input = include_str!("../inputs/day_12_test.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
-        assert_eq!(result, 21);
+        assert_eq!(result, 525_152);
         Ok(())
     }
 
@@ -211,7 +214,7 @@ mod tests {
         let input = include_str!("../inputs/day_12.txt");
         let condition_records: ConditionRecords = input.parse()?;
         let result = condition_records.num_arrangements();
-        assert_eq!(result, 7718);
+        assert_eq!(result, 128_741_994_134_728);
         Ok(())
     }
 }
