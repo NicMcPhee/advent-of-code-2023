@@ -1,5 +1,5 @@
 use miette::Diagnostic;
-use ndarray::{Array, Array2, ShapeError};
+use ndarray::{Array, Array2, Axis, ShapeError};
 use std::{fmt::Write, str::FromStr};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
@@ -63,6 +63,48 @@ impl Pattern {
         let array = Array::from_shape_vec((num_rows, num_columns), locations)?;
         Ok(Self { array })
     }
+
+    fn reflection_value(&self) -> Option<usize> {
+        // We need to multiply the value returned by `axis_reflection_value`
+        // by 100 when it's a horizontal line of reflection. The will happen
+        // when we are iterating along the vertical (columns) axis, which is
+        // `Axis(1)`. Otherwise we leave the value alone, i.e., multiply by 1.
+        [(Axis(0), 1), (Axis(1), 100)]
+            .into_iter()
+            .find_map(|(a, multiplier)| {
+                self.axis_reflection_value(a)
+                    .map(|position| multiplier * position)
+            })
+    }
+
+    fn axis_reflection_value(&self, axis: Axis) -> Option<usize> {
+        let num_lanes = self.array.lanes(axis).into_iter().len();
+        (1..num_lanes)
+            // See if there is a reflection around lane `n`
+            // along the given axis. `n` is the number of elements
+            // to the left (or above) the lane of reflection.
+            .find(|&n| self.check_axis_reflection(axis, n))
+    }
+
+    // Look for a lane parallel to the given axis where the pattern is a
+    // palindrome on either side of that lane. So if `axis` is `Axis(0)`
+    // then we're looking for a horizontal plane of reflection (row), and if
+    // `axis` is `Axis(1)` the we're for a vertical plane of reflection (columns).
+    fn check_axis_reflection(&self, axis: Axis, n: usize) -> bool {
+        let lanes = self.array.lanes(axis);
+        lanes
+            .clone()
+            .into_iter()
+            // Get the first `n` lanes
+            .take(n)
+            // We always want to reverse the first iterator because that ensures
+            // that we're checking the palindrome from the inside out.
+            .rev()
+            // `zip` stops when either iterator returns `None`, so this will only
+            // compare the "existing" row pairs and stop as soon as either is empty.
+            .zip(lanes.into_iter().skip(n))
+            .all(|(r1, r2)| r1 == r2)
+    }
 }
 
 impl FromStr for Pattern {
@@ -101,14 +143,17 @@ impl FromStr for LavaIslandMap {
 
 impl LavaIslandMap {
     fn reflection_positions(&self) -> usize {
-        todo!()
+        self.patterns
+            .iter()
+            .filter_map(Pattern::reflection_value)
+            .sum()
     }
 }
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_13_test.txt");
+    let input = include_str!("../inputs/day_13.txt");
     let lava_island_map = LavaIslandMap::from_str(input)?;
-    println!("{lava_island_map:#?}");
+    // println!("{lava_island_map:#?}");
     let result = lava_island_map.reflection_positions();
     println!("Result: {result}");
 
@@ -121,18 +166,18 @@ mod tests {
 
     #[test]
     fn check_test_input() -> Result<(), LavaIslandMapError> {
-        let input = include_str!("../inputs/day_11_test.txt");
-        let lava_island_map = LavaIslandMap::from_str(input)?; // .unwrap();
-        let result = lava_island_map.reflection_positions(); // .unwrap();
+        let input = include_str!("../inputs/day_13_test.txt");
+        let lava_island_map = LavaIslandMap::from_str(input)?;
+        let result = lava_island_map.reflection_positions();
         assert_eq!(result, 405);
         Ok(())
     }
 
     #[test]
     fn check_full_input() {
-        let input = include_str!("../inputs/day_11.txt");
+        let input = include_str!("../inputs/day_13.txt");
         let lava_island_map = LavaIslandMap::from_str(input).unwrap();
         let result = lava_island_map.reflection_positions();
-        assert_eq!(result, 10_885_634);
+        assert_eq!(result, 27_742);
     }
 }
