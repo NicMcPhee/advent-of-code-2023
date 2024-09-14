@@ -1,6 +1,6 @@
 use miette::Diagnostic;
 use ndarray::{Array, Array2, ShapeError};
-use std::str::FromStr;
+use std::{fmt::Write, str::FromStr};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
 enum LavaIslandMapError {
@@ -20,6 +20,15 @@ enum Location {
     Rock,
 }
 
+impl std::fmt::Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ash => f.write_char('.'),
+            Self::Rock => f.write_char('#'),
+        }
+    }
+}
+
 impl Location {
     const fn from_char(c: char) -> Result<Self, LavaIslandMapError> {
         Ok(match c {
@@ -33,6 +42,18 @@ impl Location {
 #[derive(Debug)]
 struct Pattern {
     array: Array2<Location>,
+}
+
+impl std::fmt::Display for Pattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for row in self.array.rows() {
+            for location in row {
+                location.fmt(f)?;
+            }
+            f.write_char('\n')?;
+        }
+        Ok(())
+    }
 }
 
 impl Pattern {
