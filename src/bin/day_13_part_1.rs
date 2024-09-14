@@ -14,7 +14,7 @@ enum LavaIslandMapError {
     IllegalLocation(char),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum Location {
     Ash,
     Rock,
