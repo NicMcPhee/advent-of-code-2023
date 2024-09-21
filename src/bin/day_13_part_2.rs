@@ -1,6 +1,6 @@
 use miette::Diagnostic;
-use ndarray::{Array, Array2, Axis, ShapeError};
-use std::{fmt::Write, str::FromStr};
+use ndarray::{indices_of, Array, Array2, Axis, ShapeError};
+use std::{collections::HashSet, fmt::Write, str::FromStr};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
 enum LavaIslandMapError {
@@ -37,6 +37,33 @@ impl Location {
             c => return Err(LavaIslandMapError::IllegalLocation(c)),
         })
     }
+
+    fn smudge_in_place(&mut self) {
+        *self = match self {
+            Self::Ash => Self::Rock,
+            Self::Rock => Self::Ash,
+        }
+    }
+}
+
+#[derive(Hash, PartialEq, Eq)]
+struct Reflection {
+    axis: Axis,
+    index: usize,
+}
+
+impl Reflection {
+    const fn new(axis: Axis, index: usize) -> Self {
+        Self { axis, index }
+    }
+
+    fn value(&self) -> usize {
+        match self.axis {
+            Axis(0) => self.index,
+            Axis(1) => 100 * self.index,
+            axis => unreachable!("Axis {axis:?} should be created"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -64,26 +91,50 @@ impl Pattern {
         Ok(Self { array })
     }
 
-    fn reflection_value(&self) -> Option<usize> {
+    fn reflection_value_with_smudges(&mut self) -> Option<usize> {
+        let original_reflections = self.reflection_values();
+        for index in indices_of(&self.array) {
+            let location = self.array.get_mut(index).unwrap();
+            location.smudge_in_place();
+
+            let new_reflections = self.reflection_values();
+
+            let location = self.array.get_mut(index).unwrap();
+            location.smudge_in_place();
+
+            let mut diff = new_reflections.difference(&original_reflections);
+            if let Some(reflection) = diff.next() {
+                return Some(reflection.value());
+            };
+        }
+        None
+    }
+
+    // Return a `HashSet` of reflections.
+    fn reflection_values(&self) -> HashSet<Reflection> {
         // We need to multiply the value returned by `axis_reflection_value`
         // by 100 when it's a horizontal line of reflection. The will happen
         // when we are iterating along the vertical (columns) axis, which is
         // `Axis(1)`. Otherwise we leave the value alone, i.e., multiply by 1.
-        [(Axis(0), 1), (Axis(1), 100)]
+
+        [Axis(0), Axis(1)]
             .into_iter()
-            .find_map(|(a, multiplier)| {
-                self.axis_reflection_value(a)
-                    .map(|position| multiplier * position)
+            .flat_map(|axis| {
+                self.axis_reflection_position(axis)
+                    .into_iter()
+                    .map(move |position| Reflection::new(axis, position))
             })
+            .collect()
     }
 
-    fn axis_reflection_value(&self, axis: Axis) -> Option<usize> {
+    fn axis_reflection_position(&self, axis: Axis) -> Vec<usize> {
         let num_lanes = self.array.lanes(axis).into_iter().len();
         (1..num_lanes)
             // See if there is a reflection around lane `n`
             // along the given axis. `n` is the number of elements
             // to the left (or above) the lane of reflection.
-            .find(|&n| self.check_axis_reflection(axis, n))
+            .filter(|&n| self.check_axis_reflection(axis, n))
+            .collect()
     }
 
     // Look for a lane parallel to the given axis where the pattern is a
@@ -103,7 +154,7 @@ impl Pattern {
             // `zip` stops when either iterator returns `None`, so this will only
             // compare the "existing" row pairs and stop as soon as either is empty.
             .zip(lanes.into_iter().skip(n))
-            .all(|(r1, r2)| r1 == r2)
+            .all(|(first_lane, second_lane)| first_lane == second_lane)
     }
 }
 
@@ -142,17 +193,17 @@ impl FromStr for LavaIslandMap {
 }
 
 impl LavaIslandMap {
-    fn reflection_positions(&self) -> usize {
+    fn reflection_positions(&mut self) -> usize {
         self.patterns
-            .iter()
-            .filter_map(Pattern::reflection_value)
+            .iter_mut()
+            .filter_map(Pattern::reflection_value_with_smudges)
             .sum()
     }
 }
 
 fn main() -> miette::Result<()> {
     let input = include_str!("../inputs/day_13.txt");
-    let lava_island_map = LavaIslandMap::from_str(input)?;
+    let mut lava_island_map = LavaIslandMap::from_str(input)?;
     // println!("{lava_island_map:#?}");
     let result = lava_island_map.reflection_positions();
     println!("Result: {result}");
@@ -167,7 +218,7 @@ mod tests {
     #[test]
     fn check_test_input() -> Result<(), LavaIslandMapError> {
         let input = include_str!("../inputs/day_13_test.txt");
-        let lava_island_map = LavaIslandMap::from_str(input)?;
+        let mut lava_island_map = LavaIslandMap::from_str(input)?;
         let result = lava_island_map.reflection_positions();
         assert_eq!(result, 400);
         Ok(())
@@ -176,8 +227,8 @@ mod tests {
     #[test]
     fn check_full_input() {
         let input = include_str!("../inputs/day_13.txt");
-        let lava_island_map = LavaIslandMap::from_str(input).unwrap();
+        let mut lava_island_map = LavaIslandMap::from_str(input).unwrap();
         let result = lava_island_map.reflection_positions();
-        assert_eq!(result, 27_742);
+        assert_eq!(result, 32_728);
     }
 }
