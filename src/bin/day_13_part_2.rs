@@ -169,7 +169,7 @@ mod tests {
         let input = include_str!("../inputs/day_13_test.txt");
         let lava_island_map = LavaIslandMap::from_str(input)?;
         let result = lava_island_map.reflection_positions();
-        assert_eq!(result, 405);
+        assert_eq!(result, 400);
         Ok(())
     }
 
