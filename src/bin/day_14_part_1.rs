@@ -14,7 +14,10 @@ enum PlatformError {
     IllegalLocation(char),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+/// For this to work, Round must come be before Empty in this
+/// enum definition, since the sorting in `Platform::roll_lane_forwards()`
+/// requires that Round < Empty.
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd)]
 enum Location {
     Round,
     Cube,
@@ -42,6 +45,36 @@ impl Location {
     }
 }
 
+/// Where we're rolling to.
+#[derive(Debug, Clone, Copy)]
+enum CardinalDirection {
+    North,
+    South,
+    East,
+    West,
+}
+
+impl CardinalDirection {
+    const fn axis(self) -> Axis {
+        match self {
+            Self::North | Self::South => Axis(0),
+            Self::East | Self::West => Axis(1),
+        }
+    }
+
+    const fn lane_direction(self) -> LaneDirection {
+        match self {
+            Self::North | Self::West => LaneDirection::Forward,
+            Self::South | Self::East => LaneDirection::Reversed,
+        }
+    }
+}
+
+enum LaneDirection {
+    Forward,
+    Reversed,
+}
+
 #[derive(Debug)]
 struct Platform {
     array: Array2<Location>,
@@ -67,8 +100,42 @@ impl Platform {
         Ok(Self { array })
     }
 
-    fn total_load(&self) -> usize {
+    fn total_load(&self, direction: CardinalDirection) -> Result<usize, PlatformError> {
+        let platform_after_rolling = self.roll(direction)?;
+        println!("{platform_after_rolling}");
         todo!()
+    }
+
+    fn roll_lane<'a>(
+        lane: impl IntoIterator<Item = &'a Location, IntoIter: DoubleEndedIterator>,
+        lane_direction: &LaneDirection,
+    ) -> Vec<Location> {
+        match lane_direction {
+            LaneDirection::Forward => Self::roll_lane_forwards(lane),
+            LaneDirection::Reversed => Self::roll_lane_forwards(lane.into_iter().rev()),
+        }
+    }
+
+    fn roll_lane_forwards<'a>(locations: impl IntoIterator<Item = &'a Location>) -> Vec<Location> {
+        let mut locations = locations.into_iter().copied().collect::<Vec<_>>();
+        locations
+            .split_mut(|location| location == &Location::Cube)
+            .for_each(<[Location]>::sort_unstable);
+        locations
+    }
+
+    fn num_lanes_in_direction(&self, direction: CardinalDirection) -> usize {
+        self.array.lanes(direction.axis()).into_iter().len()
+    }
+
+    fn roll(&self, direction: CardinalDirection) -> Result<Self, PlatformError> {
+        let lanes: Vec<Location> = self
+            .array
+            .lanes(direction.axis())
+            .into_iter()
+            .flat_map(|lane| Self::roll_lane(lane, &direction.lane_direction()))
+            .collect();
+        Self::new(self.num_lanes_in_direction(direction), lanes)
     }
 }
 
@@ -89,7 +156,7 @@ fn main() -> miette::Result<()> {
     let input = include_str!("../inputs/day_14_test.txt");
     let platform = Platform::from_str(input)?;
     println!("{platform:#?}");
-    let result = platform.total_load();
+    let result = platform.total_load(CardinalDirection::North)?;
     println!("Result: {result}");
 
     Ok(())
@@ -100,19 +167,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_day_14_test_input() -> Result<(), PlatformError> {
+    fn check_day_14_test_input() {
         let input = include_str!("../inputs/day_14_test.txt");
-        let platform = Platform::from_str(input)?;
-        let result = platform.total_load();
+        let platform = Platform::from_str(input).unwrap();
+        let result = platform.total_load(CardinalDirection::North).unwrap();
         assert_eq!(result, 136);
-        Ok(())
     }
 
     #[test]
     fn check_day_14_full_input() {
         let input = include_str!("../inputs/day_14.txt");
         let platform = Platform::from_str(input).unwrap();
-        let result = platform.total_load();
+        let result = platform.total_load(CardinalDirection::North).unwrap();
         assert_eq!(result, 27_742);
     }
 }
