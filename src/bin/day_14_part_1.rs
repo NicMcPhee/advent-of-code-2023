@@ -4,11 +4,12 @@ use std::{fmt::Write, str::FromStr};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
 enum PlatformError {
-    // #[error("Tried to parse a pattern with no lines")]
-    // EmptyPattern,
+    #[error("Tried to parse a pattern with no lines")]
+    EmptyPattern,
 
-    // #[error(transparent)]
-    // ArrayShape(#[from] ShapeError),
+    #[error(transparent)]
+    ArrayShape(#[from] ShapeError),
+
     #[error("Illegal location character {0}")]
     IllegalLocation(char),
 }
@@ -60,11 +61,10 @@ impl std::fmt::Display for Platform {
 
 impl Platform {
     fn new(num_columns: usize, locations: Vec<Location>) -> Result<Self, PlatformError> {
-        // debug_assert_eq!(locations.len() % num_columns, 0);
-        // let num_rows = locations.len() / num_columns;
-        // let array = Array::from_shape_vec((num_rows, num_columns), locations)?;
-        // Ok(Self { array })
-        todo!()
+        debug_assert_eq!(locations.len() % num_columns, 0);
+        let num_rows = locations.len() / num_columns;
+        let array = Array::from_shape_vec((num_rows, num_columns), locations)?;
+        Ok(Self { array })
     }
 
     fn total_load(&self) -> usize {
@@ -76,22 +76,17 @@ impl FromStr for Platform {
     type Err = PlatformError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // let num_columns = s
-        //     .lines()
-        //     .next()
-        //     .ok_or(LavaIslandMapError::EmptyPattern)?
-        //     .len();
-        // let locations = s
-        //     .lines()
-        //     .flat_map(|s| s.chars().map(Location::from_char))
-        //     .collect::<Result<Vec<Location>, _>>()?;
-        // Self::new(num_columns, locations)
-        todo!()
+        let num_columns = s.lines().next().ok_or(PlatformError::EmptyPattern)?.len();
+        let locations = s
+            .lines()
+            .flat_map(|s| s.chars().map(Location::from_char))
+            .collect::<Result<Vec<Location>, _>>()?;
+        Self::new(num_columns, locations)
     }
 }
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_13.txt");
+    let input = include_str!("../inputs/day_14_test.txt");
     let platform = Platform::from_str(input)?;
     println!("{platform:#?}");
     let result = platform.total_load();
@@ -105,7 +100,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_test_input() -> Result<(), PlatformError> {
+    fn check_day_14_test_input() -> Result<(), PlatformError> {
         let input = include_str!("../inputs/day_14_test.txt");
         let platform = Platform::from_str(input)?;
         let result = platform.total_load();
@@ -114,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn check_full_input() {
+    fn check_day_14_full_input() {
         let input = include_str!("../inputs/day_14.txt");
         let platform = Platform::from_str(input).unwrap();
         let result = platform.total_load();
