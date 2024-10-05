@@ -132,7 +132,17 @@ impl Platform {
             .into_iter()
             .flat_map(|lane| Self::roll_lane(lane, &direction.lane_direction()))
             .collect();
-        Self::new(self.num_lanes_in_direction(direction), locations)
+        let mut result = Self::new(self.num_lanes_in_direction(direction), locations)?;
+        match direction {
+            CardinalDirection::North => result.array.swap_axes(0, 1),
+            CardinalDirection::South => {
+                result.array.swap_axes(0, 1);
+                result.array.invert_axis(Axis(0));
+            }
+            CardinalDirection::East => result.array.invert_axis(Axis(1)),
+            CardinalDirection::West => {}
+        }
+        Ok(result)
     }
 
     fn roll_lane<'a>(
