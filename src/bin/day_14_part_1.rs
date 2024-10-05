@@ -102,8 +102,35 @@ impl Platform {
 
     fn total_load(&self, direction: CardinalDirection) -> Result<usize, PlatformError> {
         let platform_after_rolling = self.roll(direction)?;
-        println!("{platform_after_rolling}");
-        todo!()
+        // println!("{platform_after_rolling}");
+        Ok(platform_after_rolling
+            .array
+            .lanes(Axis(1))
+            .into_iter()
+            .map(Self::lane_load)
+            .sum())
+    }
+
+    fn lane_load<'a>(
+        lane: impl IntoIterator<Item = &'a Location, IntoIter: DoubleEndedIterator>,
+    ) -> usize {
+        lane.into_iter()
+            .rev()
+            .enumerate()
+            .filter_map(|(position, location)| {
+                (location == &Location::Round).then_some(position + 1)
+            })
+            .sum()
+    }
+
+    fn roll(&self, direction: CardinalDirection) -> Result<Self, PlatformError> {
+        let locations: Vec<Location> = self
+            .array
+            .lanes(direction.axis())
+            .into_iter()
+            .flat_map(|lane| Self::roll_lane(lane, &direction.lane_direction()))
+            .collect();
+        Self::new(self.num_lanes_in_direction(direction), locations)
     }
 
     fn roll_lane<'a>(
@@ -127,16 +154,6 @@ impl Platform {
     fn num_lanes_in_direction(&self, direction: CardinalDirection) -> usize {
         self.array.lanes(direction.axis()).into_iter().len()
     }
-
-    fn roll(&self, direction: CardinalDirection) -> Result<Self, PlatformError> {
-        let lanes: Vec<Location> = self
-            .array
-            .lanes(direction.axis())
-            .into_iter()
-            .flat_map(|lane| Self::roll_lane(lane, &direction.lane_direction()))
-            .collect();
-        Self::new(self.num_lanes_in_direction(direction), lanes)
-    }
 }
 
 impl FromStr for Platform {
@@ -153,7 +170,7 @@ impl FromStr for Platform {
 }
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_14_test.txt");
+    let input = include_str!("../inputs/day_14.txt");
     let platform = Platform::from_str(input)?;
     println!("{platform:#?}");
     let result = platform.total_load(CardinalDirection::North)?;
@@ -179,6 +196,6 @@ mod tests {
         let input = include_str!("../inputs/day_14.txt");
         let platform = Platform::from_str(input).unwrap();
         let result = platform.total_load(CardinalDirection::North).unwrap();
-        assert_eq!(result, 27_742);
+        assert_eq!(result, 109_755);
     }
 }
