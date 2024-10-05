@@ -1,6 +1,11 @@
 use miette::Diagnostic;
 use ndarray::{Array, Array2, Axis, ShapeError};
-use std::{fmt::Write, str::FromStr};
+use std::{
+    collections::HashSet,
+    fmt::Write,
+    hash::{DefaultHasher, Hash, Hasher},
+    str::FromStr,
+};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
 enum PlatformError {
@@ -17,7 +22,7 @@ enum PlatformError {
 /// For this to work, Round must come be before Empty in this
 /// enum definition, since the sorting in `Platform::roll_lane_forwards()`
 /// requires that Round < Empty.
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd, Hash)]
 enum Location {
     Round,
     Cube,
@@ -75,7 +80,7 @@ enum LaneDirection {
     Reversed,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct Platform {
     array: Array2<Location>,
 }
@@ -101,13 +106,15 @@ impl Platform {
     }
 
     fn total_load_after_cycles(self, num_cycles: usize) -> Result<usize, PlatformError> {
+        let mut seen_hashes = HashSet::new();
         // Loop over number cycles
         //   roll in each of the four directions
         // compute_load
         let mut platform = self;
+        seen_hashes.insert(platform.hash_code());
         for cycle in 0..num_cycles {
             if cycle % 1_000_000 == 0 {
-                println!("At cycle {cycle}.");
+                println!("At cycle {cycle} with {} hashes.", seen_hashes.len());
             }
             let platform_after_cycle = platform
                 .roll(CardinalDirection::North)?
@@ -115,12 +122,15 @@ impl Platform {
                 .roll(CardinalDirection::South)?
                 .roll(CardinalDirection::East)?;
             // println!("{platform_after_cycle}");
-            if platform_after_cycle == platform {
+            let new_hash = platform_after_cycle.hash_code();
+            if seen_hashes.contains(&new_hash) {
                 println!("Breaking out at cycle {cycle}");
                 break;
             }
+            seen_hashes.insert(new_hash);
             platform = platform_after_cycle;
         }
+        println!("Final platform\n{platform}");
         Ok(platform.compute_load())
     }
 
@@ -132,7 +142,7 @@ impl Platform {
 
     fn compute_load(&self) -> usize {
         self.array
-            .lanes(Axis(1))
+            .lanes(Axis(0))
             .into_iter()
             .map(Self::lane_load)
             .sum()
@@ -190,6 +200,12 @@ impl Platform {
 
     fn num_lanes_in_direction(&self, direction: CardinalDirection) -> usize {
         self.array.lanes(direction.axis()).into_iter().len()
+    }
+
+    fn hash_code(&self) -> u64 {
+        let mut s = DefaultHasher::new();
+        self.hash(&mut s);
+        s.finish()
     }
 }
 
