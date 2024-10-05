@@ -57,6 +57,10 @@ impl Reflection {
         Self { axis, index }
     }
 
+    // We need to multiply the value returned by `axis_reflection_value`
+    // by 100 when it's a horizontal line of reflection. The will happen
+    // when we are iterating along the vertical (columns) axis, which is
+    // `Axis(1)`. Otherwise we leave the value alone, i.e., multiply by 1.
     fn value(&self) -> usize {
         match self.axis {
             Axis(0) => self.index,
@@ -110,13 +114,7 @@ impl Pattern {
         None
     }
 
-    // Return a `HashSet` of reflections.
     fn reflection_values(&self) -> HashSet<Reflection> {
-        // We need to multiply the value returned by `axis_reflection_value`
-        // by 100 when it's a horizontal line of reflection. The will happen
-        // when we are iterating along the vertical (columns) axis, which is
-        // `Axis(1)`. Otherwise we leave the value alone, i.e., multiply by 1.
-
         [Axis(0), Axis(1)]
             .into_iter()
             .flat_map(|axis| {
