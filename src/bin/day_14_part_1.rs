@@ -47,7 +47,7 @@ impl Location {
 
 /// Where we're rolling to.
 #[derive(Debug, Clone, Copy)]
-enum CardinalDirection {
+pub enum CardinalDirection {
     North,
     South,
     East,
