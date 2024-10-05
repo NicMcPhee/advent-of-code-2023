@@ -1,5 +1,3 @@
-// 1000000000
-
 use miette::Diagnostic;
 use ndarray::{Array, Array2, Axis, ShapeError};
 use std::{fmt::Write, str::FromStr};
@@ -48,7 +46,7 @@ impl Location {
 }
 
 /// Where we're rolling to.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardinalDirection {
     North,
     South,
@@ -77,7 +75,7 @@ enum LaneDirection {
     Reversed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Platform {
     array: Array2<Location>,
 }
@@ -102,15 +100,42 @@ impl Platform {
         Ok(Self { array })
     }
 
-    fn total_load(&self, direction: CardinalDirection) -> Result<usize, PlatformError> {
-        let platform_after_rolling = self.roll(direction)?;
-        // println!("{platform_after_rolling}");
-        Ok(platform_after_rolling
-            .array
+    fn total_load_after_cycles(self, num_cycles: usize) -> Result<usize, PlatformError> {
+        // Loop over number cycles
+        //   roll in each of the four directions
+        // compute_load
+        let mut platform = self;
+        for cycle in 0..num_cycles {
+            if cycle % 1_000_000 == 0 {
+                println!("At cycle {cycle}.");
+            }
+            let platform_after_cycle = platform
+                .roll(CardinalDirection::North)?
+                .roll(CardinalDirection::West)?
+                .roll(CardinalDirection::South)?
+                .roll(CardinalDirection::East)?;
+            // println!("{platform_after_cycle}");
+            if platform_after_cycle == platform {
+                println!("Breaking out at cycle {cycle}");
+                break;
+            }
+            platform = platform_after_cycle;
+        }
+        Ok(platform.compute_load())
+    }
+
+    // fn total_load(&self, direction: CardinalDirection) -> Result<usize, PlatformError> {
+    //     let platform_after_rolling = self.roll(direction)?;
+    //     // println!("{platform_after_rolling}");
+    //     Ok(platform_after_rolling.compute_load())
+    // }
+
+    fn compute_load(&self) -> usize {
+        self.array
             .lanes(Axis(1))
             .into_iter()
             .map(Self::lane_load)
-            .sum())
+            .sum()
     }
 
     fn lane_load<'a>(
@@ -181,11 +206,13 @@ impl FromStr for Platform {
     }
 }
 
+const NUM_CYCLES: usize = 1_000_000_000;
+
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_14.txt");
+    let input = include_str!("../inputs/day_14_test.txt");
     let platform = Platform::from_str(input)?;
-    println!("{platform:#?}");
-    let result = platform.total_load(CardinalDirection::North)?;
+    // println!("{platform:#?}");
+    let result = platform.total_load_after_cycles(NUM_CYCLES)?;
     println!("Result: {result}");
 
     Ok(())
@@ -199,7 +226,7 @@ mod tests {
     fn check_day_14_test_input() {
         let input = include_str!("../inputs/day_14_test.txt");
         let platform = Platform::from_str(input).unwrap();
-        let result = platform.total_load(CardinalDirection::North).unwrap();
+        let result = platform.total_load_after_cycles(NUM_CYCLES).unwrap();
         assert_eq!(result, 64);
     }
 
@@ -207,7 +234,7 @@ mod tests {
     fn check_day_14_full_input() {
         let input = include_str!("../inputs/day_14.txt");
         let platform = Platform::from_str(input).unwrap();
-        let result = platform.total_load(CardinalDirection::North).unwrap();
+        let result = platform.total_load_after_cycles(NUM_CYCLES).unwrap();
         assert_eq!(result, 109_755);
     }
 }
