@@ -1,11 +1,6 @@
 use miette::Diagnostic;
 use ndarray::{Array, Array2, Axis, ShapeError};
-use std::{
-    collections::HashSet,
-    fmt::Write,
-    hash::{DefaultHasher, Hash, Hasher},
-    str::FromStr,
-};
+use std::{collections::HashMap, fmt::Write, hash::Hash, str::FromStr};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
 enum PlatformError {
@@ -80,7 +75,7 @@ enum LaneDirection {
     Reversed,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct Platform {
     array: Array2<Location>,
 }
@@ -106,39 +101,31 @@ impl Platform {
     }
 
     fn total_load_after_cycles(self, num_cycles: usize) -> Result<usize, PlatformError> {
-        let mut seen_hashes = HashSet::new();
-        // Loop over number cycles
-        //   roll in each of the four directions
-        // compute_load
+        let mut seen_platforms: HashMap<Self, usize> = HashMap::new();
         let mut platform = self;
-        seen_hashes.insert(platform.hash_code());
-        for cycle in 0..num_cycles {
-            if cycle % 1_000_000 == 0 {
-                println!("At cycle {cycle} with {} hashes.", seen_hashes.len());
+        seen_platforms.insert(platform.clone(), 0);
+
+        let mut remaining_cycles = num_cycles;
+        let final_platform = loop {
+            if remaining_cycles == 0 {
+                break platform;
             }
-            let platform_after_cycle = platform
+            platform = platform
                 .roll(CardinalDirection::North)?
                 .roll(CardinalDirection::West)?
                 .roll(CardinalDirection::South)?
                 .roll(CardinalDirection::East)?;
-            // println!("{platform_after_cycle}");
-            let new_hash = platform_after_cycle.hash_code();
-            if seen_hashes.contains(&new_hash) {
-                println!("Breaking out at cycle {cycle}");
-                break;
+            remaining_cycles -= 1;
+            if let Some(&remaining_cycles_at_loop_start) = seen_platforms.get(&platform) {
+                seen_platforms.clear();
+                remaining_cycles %= remaining_cycles_at_loop_start - remaining_cycles;
+            } else {
+                seen_platforms.insert(platform.clone(), remaining_cycles);
             }
-            seen_hashes.insert(new_hash);
-            platform = platform_after_cycle;
-        }
-        println!("Final platform\n{platform}");
-        Ok(platform.compute_load())
+        };
+        // println!("Final platform\n{final_platform}");
+        Ok(final_platform.compute_load())
     }
-
-    // fn total_load(&self, direction: CardinalDirection) -> Result<usize, PlatformError> {
-    //     let platform_after_rolling = self.roll(direction)?;
-    //     // println!("{platform_after_rolling}");
-    //     Ok(platform_after_rolling.compute_load())
-    // }
 
     fn compute_load(&self) -> usize {
         self.array
@@ -201,12 +188,6 @@ impl Platform {
     fn num_lanes_in_direction(&self, direction: CardinalDirection) -> usize {
         self.array.lanes(direction.axis()).into_iter().len()
     }
-
-    fn hash_code(&self) -> u64 {
-        let mut s = DefaultHasher::new();
-        self.hash(&mut s);
-        s.finish()
-    }
 }
 
 impl FromStr for Platform {
@@ -225,7 +206,7 @@ impl FromStr for Platform {
 const NUM_CYCLES: usize = 1_000_000_000;
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_14_test.txt");
+    let input = include_str!("../inputs/day_14.txt");
     let platform = Platform::from_str(input)?;
     // println!("{platform:#?}");
     let result = platform.total_load_after_cycles(NUM_CYCLES)?;
@@ -251,6 +232,6 @@ mod tests {
         let input = include_str!("../inputs/day_14.txt");
         let platform = Platform::from_str(input).unwrap();
         let result = platform.total_load_after_cycles(NUM_CYCLES).unwrap();
-        assert_eq!(result, 109_755);
+        assert_eq!(result, 90928);
     }
 }
