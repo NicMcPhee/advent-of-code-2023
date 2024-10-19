@@ -1,5 +1,8 @@
 use miette::Diagnostic;
-use std::str::FromStr;
+use std::{
+    hash::{Hash, Hasher},
+    str::FromStr,
+};
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
 enum InitSeqError {
@@ -14,36 +17,70 @@ enum InitSeqError {
 }
 
 #[derive(Debug)]
-struct InitSeq {
-    // Figure out what we're storing.
+struct InitializationSequence {
+    steps: Vec<Step>,
 }
 
-impl InitSeq {
-    // fn new(num_columns: usize, locations: Vec<Location>) -> Result<Self, InitSeqError> {
-    //     debug_assert_eq!(locations.len() % num_columns, 0);
-    //     let num_rows = locations.len() / num_columns;
-    //     let array = Array::from_shape_vec((num_rows, num_columns), locations)?;
-    //     Ok(Self { array })
-    // }
+#[derive(Debug)]
+struct Step(String);
 
-    fn sum_of_hashes(&self) -> Result<usize, InitSeqError> {
+// TODO: We should use `BuildHasher` along with `Hasher`.
+// We can use `BuildHasherDefault<H>` that impls `BuildHasher`
+// for any `H: Hasher`. So I think we can impl `Hasher`, and
+// then use `BuildHasherDefault` to get a `BuildHasher`. We can
+// then re-use that via the `hash_one()` method to hash our
+// strings.
+
+struct InstructionHasher {}
+
+impl InstructionHasher {
+    pub fn new() -> Self {
         todo!()
     }
 }
 
-impl FromStr for InitSeq {
+impl Hasher for InstructionHasher {
+    fn finish(&self) -> u64 {
+        todo!()
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        todo!()
+    }
+}
+
+impl InitializationSequence {
+    fn sum_of_hashes(&self) -> u64 {
+        self.steps
+            .iter()
+            .map(|Step(instruction)| {
+                let mut hasher = InstructionHasher::new();
+                instruction.hash(&mut hasher);
+                hasher.finish()
+            })
+            .sum()
+    }
+}
+
+impl FromStr for InitializationSequence {
     type Err = InitSeqError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        let steps = s
+            .trim()
+            .split(',')
+            .map(ToOwned::to_owned)
+            .map(Step)
+            .collect::<Vec<_>>();
+        Ok(Self { steps })
     }
 }
 
 fn main() -> miette::Result<()> {
     let input = include_str!("../inputs/day_15_test.txt");
-    let init_seq = InitSeq::from_str(input)?;
+    let init_seq = InitializationSequence::from_str(input)?;
     println!("{init_seq:#?}");
-    let result = init_seq.sum_of_hashes()?;
+    let result = init_seq.sum_of_hashes();
     println!("Result: {result}");
 
     Ok(())
@@ -56,16 +93,16 @@ mod tests {
     #[test]
     fn check_day_15_test_input() {
         let input = include_str!("../inputs/day_15_test.txt");
-        let init_seq = InitSeq::from_str(input).unwrap();
-        let result = init_seq.sum_of_hashes().unwrap();
+        let init_seq = InitializationSequence::from_str(input).unwrap();
+        let result = init_seq.sum_of_hashes();
         assert_eq!(result, 1320);
     }
 
     #[test]
     fn check_day_15_full_input() {
         let input = include_str!("../inputs/day_15.txt");
-        let init_seq = InitSeq::from_str(input).unwrap();
-        let result = init_seq.sum_of_hashes().unwrap();
+        let init_seq = InitializationSequence::from_str(input).unwrap();
+        let result = init_seq.sum_of_hashes();
         assert_eq!(result, 109_755);
     }
 }
