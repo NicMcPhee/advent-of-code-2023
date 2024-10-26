@@ -1,20 +1,8 @@
-use miette::Diagnostic;
 use std::{
-    hash::{Hash, Hasher},
+    convert::Infallible,
+    hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
     str::FromStr,
 };
-
-#[derive(Debug, Diagnostic, thiserror::Error)]
-enum InitSeqError {
-    // #[error("Tried to parse a pattern with no lines")]
-    // EmptyPattern,
-
-    // #[error(transparent)]
-    // ArrayShape(#[from] ShapeError),
-
-    // #[error("Illegal location character {0}")]
-    // IllegalLocation(char),
-}
 
 #[derive(Debug)]
 struct InitializationSequence {
@@ -24,46 +12,43 @@ struct InitializationSequence {
 #[derive(Debug)]
 struct Step(String);
 
-// TODO: We should use `BuildHasher` along with `Hasher`.
-// We can use `BuildHasherDefault<H>` that impls `BuildHasher`
-// for any `H: Hasher`. So I think we can impl `Hasher`, and
-// then use `BuildHasherDefault` to get a `BuildHasher`. We can
-// then re-use that via the `hash_one()` method to hash our
-// strings.
-
-struct InstructionHasher {}
-
-impl InstructionHasher {
-    pub fn new() -> Self {
-        todo!()
+impl Hash for Step {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        u8::hash_slice(self.0.as_bytes(), state);
     }
+}
+
+#[derive(Default)]
+struct InstructionHasher {
+    current_value: u8,
 }
 
 impl Hasher for InstructionHasher {
     fn finish(&self) -> u64 {
-        todo!()
+        self.current_value.into()
     }
 
     fn write(&mut self, bytes: &[u8]) {
-        todo!()
+        for b in bytes {
+            // self.current_value = ((self.current_value + u16::from(*b)) * 17) % 256;
+            self.current_value = self.current_value.wrapping_add(*b).wrapping_mul(17);
+        }
     }
 }
 
 impl InitializationSequence {
     fn sum_of_hashes(&self) -> u64 {
+        let hasher_builder = BuildHasherDefault::<InstructionHasher>::default();
+
         self.steps
             .iter()
-            .map(|Step(instruction)| {
-                let mut hasher = InstructionHasher::new();
-                instruction.hash(&mut hasher);
-                hasher.finish()
-            })
+            .map(|step| hasher_builder.hash_one(step))
             .sum()
     }
 }
 
 impl FromStr for InitializationSequence {
-    type Err = InitSeqError;
+    type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let steps = s
@@ -76,19 +61,24 @@ impl FromStr for InitializationSequence {
     }
 }
 
-fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_15_test.txt");
-    let init_seq = InitializationSequence::from_str(input)?;
-    println!("{init_seq:#?}");
+fn main() {
+    let input = include_str!("../inputs/day_15.txt");
+    let init_seq = InitializationSequence::from_str(input).unwrap();
+    // println!("{init_seq:#?}");
     let result = init_seq.sum_of_hashes();
     println!("Result: {result}");
-
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hash_hash() {
+        let hasher_builder = BuildHasherDefault::<InstructionHasher>::default();
+        let hash = hasher_builder.hash_one(Step("HASH".to_string()));
+        assert_eq!(hash, 52);
+    }
 
     #[test]
     fn check_day_15_test_input() {
@@ -103,6 +93,6 @@ mod tests {
         let input = include_str!("../inputs/day_15.txt");
         let init_seq = InitializationSequence::from_str(input).unwrap();
         let result = init_seq.sum_of_hashes();
-        assert_eq!(result, 109_755);
+        assert_eq!(result, 510_792);
     }
 }
