@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    hash::{BuildHasherDefault, Hash, Hasher},
+    hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
     str::FromStr,
 };
 
@@ -27,17 +27,13 @@ enum FocalLength {
 
 /// The hash of a `Label` tells us which box a lens
 /// an operation is applied to.
-#[derive(Debug)]
+#[derive(Debug, Eq, Clone)]
 struct Label(Vec<u8>);
 
 impl PartialEq for Label {
-    fn eq(&self, _: &Self) -> bool {
-        // When used in a `HashMap`, any two `Label`s with the
-        // same hash code should be seen as equal. Here we're just
-        // saying that _all_ `Label`s are equal, and counting on
-        // `HashMap` to discriminate on hash codes
-        // before checking equality.
-        true
+    fn eq(&self, other: &Self) -> bool {
+        let hasher_builder = BuildHasherDefault::<LabelHasher>::default();
+        hasher_builder.hash_one(self) == hasher_builder.hash_one(other)
     }
 }
 
@@ -53,9 +49,19 @@ impl Hash for Label {
     }
 }
 
-struct Lens {
-    label: Label,
+#[derive(Debug)]
+struct Lens<'a> {
+    label: &'a Label,
     focal_length: FocalLength,
+}
+
+impl<'a> Lens<'a> {
+    const fn new(label: &'a Label, focal_length: FocalLength) -> Self {
+        Self {
+            label,
+            focal_length,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -100,11 +106,11 @@ impl FromStr for Step {
 }
 
 #[derive(Default)]
-struct InstructionHasher {
+struct LabelHasher {
     current_value: u8,
 }
 
-impl Hasher for InstructionHasher {
+impl Hasher for LabelHasher {
     fn finish(&self) -> u64 {
         self.current_value.into()
     }
@@ -119,10 +125,8 @@ impl Hasher for InstructionHasher {
 
 impl InitializationSequence {
     fn focusing_power(&self) -> u64 {
-        let hasher_builder = BuildHasherDefault::<InstructionHasher>::default();
-        let boxes = HashMap::<Label, Vec<Lens>, BuildHasherDefault<InstructionHasher>>::with_hasher(
-            hasher_builder,
-        );
+        let hasher_builder = BuildHasherDefault::<LabelHasher>::default();
+        let mut boxes: HashMap<&Label, Vec<Lens>, _> = HashMap::with_hasher(hasher_builder);
 
         // Loop over instruction sequence, updating the lenses in the boxes
         //   See if there's an entry in `boxes` for this `Label`, creating a new
@@ -135,6 +139,30 @@ impl InitializationSequence {
         //      Check the `Vec<Lens>` and see if there's one with this label
         //         If there is, update it's focal length to be the new focal length
         //         If there isn't, `push` a new `Lens` onto the `Vec`.
+
+        for step in &self.steps {
+            let entry = boxes.entry(&step.label).or_default();
+            // Needed .0 == .0 in the `find` call because we have all labels equal to all other labels,
+            // so we need to push down to the wrapped vector of `u8`.
+            let index_lens = entry
+                .iter_mut()
+                .enumerate()
+                .find(|(_, l)| l.label.0 == step.label.0);
+            match (&step.op, index_lens) {
+                (Operation::Delete, None) => {}
+                (Operation::Delete, Some((index, _))) => {
+                    entry.remove(index);
+                }
+                (Operation::Insert(focal_length), None) => {
+                    entry.push(Lens::new(&step.label, *focal_length));
+                }
+                (Operation::Insert(focal_length), Some((_, lens))) => {
+                    lens.focal_length = *focal_length;
+                }
+            }
+        }
+
+        dbg!(&boxes);
 
         // Loop over boxes (using the keys of the `HashMap`)
         //   *Make sure to add one to the box number*
