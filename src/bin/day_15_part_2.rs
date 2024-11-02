@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
+    ops::Mul,
     str::FromStr,
 };
 
@@ -23,6 +24,14 @@ enum FocalLength {
     F7,
     F8,
     F9,
+}
+
+impl Mul<FocalLength> for u64 {
+    type Output = Self;
+
+    fn mul(self, focal_length: FocalLength) -> Self::Output {
+        self * Self::from(focal_length as u8)
+    }
 }
 
 /// The hash of a `Label` tells us which box a lens
@@ -79,7 +88,7 @@ struct Step {
 }
 
 #[derive(Debug)]
-enum ParseStepError {
+pub enum ParseStepError {
     InvalidRepresentation(String),
     IllegalFocalLength(char),
 }
@@ -126,7 +135,7 @@ impl Hasher for LabelHasher {
 impl InitializationSequence {
     fn focusing_power(&self) -> u64 {
         let hasher_builder = BuildHasherDefault::<LabelHasher>::default();
-        let mut boxes: HashMap<&Label, Vec<Lens>, _> = HashMap::with_hasher(hasher_builder);
+        let mut boxes: HashMap<&Label, Vec<Lens>, _> = HashMap::with_hasher(hasher_builder.clone());
 
         // Loop over instruction sequence, updating the lenses in the boxes
         //   See if there's an entry in `boxes` for this `Label`, creating a new
@@ -162,7 +171,7 @@ impl InitializationSequence {
             }
         }
 
-        dbg!(&boxes);
+        // dbg!(&boxes);
 
         // Loop over boxes (using the keys of the `HashMap`)
         //   *Make sure to add one to the box number*
@@ -171,7 +180,16 @@ impl InitializationSequence {
         //     Do math
         //   sum()
         // sum()
-        todo!()
+
+        boxes
+            .into_iter()
+            .flat_map(|(label, lenses)| {
+                let box_number = hasher_builder.hash_one(label) + 1;
+                lenses.into_iter().enumerate().map(move |(index, lens)| {
+                    box_number * (u64::try_from(index).unwrap() + 1) * lens.focal_length
+                })
+            })
+            .sum()
     }
 }
 
@@ -189,7 +207,7 @@ impl FromStr for InitializationSequence {
 }
 
 fn main() {
-    let input = include_str!("../inputs/day_15_test.txt");
+    let input = include_str!("../inputs/day_15.txt");
     let init_seq = InitializationSequence::from_str(input).unwrap();
     // println!("{init_seq:#?}");
     let result = init_seq.focusing_power();
@@ -213,6 +231,6 @@ mod tests {
         let input = include_str!("../inputs/day_15.txt");
         let init_seq = InitializationSequence::from_str(input).unwrap();
         let result = init_seq.focusing_power();
-        assert_eq!(result, 510_792);
+        assert_eq!(result, 269_410);
     }
 }
