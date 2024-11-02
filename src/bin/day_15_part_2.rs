@@ -30,6 +30,7 @@ impl Mul<FocalLength> for u64 {
     type Output = Self;
 
     fn mul(self, focal_length: FocalLength) -> Self::Output {
+        // The `as` here is safe because we're using `u8` as the representation for `FocalLength`.
         self * Self::from(focal_length as u8)
     }
 }
