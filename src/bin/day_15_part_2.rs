@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
-    convert::Infallible,
-    hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
+    hash::{BuildHasherDefault, Hash, Hasher},
     str::FromStr,
 };
 
@@ -26,6 +25,8 @@ enum FocalLength {
     F9,
 }
 
+/// The hash of a `Label` tells us which box a lens
+/// an operation is applied to.
 #[derive(Debug)]
 struct Label(Vec<u8>);
 
@@ -65,6 +66,8 @@ enum Operation {
 
 #[derive(Debug)]
 struct Step {
+    // The hash of this label tells us which box the operation
+    // is applied to.
     label: Label,
     op: Operation,
 }
@@ -115,15 +118,6 @@ impl Hasher for InstructionHasher {
 }
 
 impl InitializationSequence {
-    // fn sum_of_hashes(&self) -> u64 {
-    //     let hasher_builder = BuildHasherDefault::<InstructionHasher>::default();
-
-    //     self.steps
-    //         .iter()
-    //         .map(|step| hasher_builder.hash_one(step))
-    //         .sum()
-    // }
-
     fn focusing_power(&self) -> u64 {
         let hasher_builder = BuildHasherDefault::<InstructionHasher>::default();
         let boxes = HashMap::<Label, Vec<Lens>, BuildHasherDefault<InstructionHasher>>::with_hasher(
@@ -131,10 +125,20 @@ impl InitializationSequence {
         );
 
         // Loop over instruction sequence, updating the lenses in the boxes
+        //   See if there's an entry in `boxes` for this `Label`, creating a new
+        //      entry if there's not.
+        //   For deletion
+        //      Check the `Vec<Lens>` and see if there's one with this label
+        //         If there is, remove it
+        //         If not, do nothing
+        //   For insertion
+        //      Check the `Vec<Lens>` and see if there's one with this label
+        //         If there is, update it's focal length to be the new focal length
+        //         If there isn't, `push` a new `Lens` onto the `Vec`.
 
         // Loop over boxes (using the keys of the `HashMap`)
         //   *Make sure to add one to the box number*
-        //   Loop over lens with indices
+        //   Loop over lens with indices (Are they going to be in the correct order? Do we need to reverse them?)
         //     *Make sure to add one to the index*
         //     Do math
         //   sum()
