@@ -8,7 +8,7 @@ use std::{
 };
 
 #[derive(Debug, Diagnostic, thiserror::Error)]
-enum PlatformError {
+enum ParseError {
     #[error("Tried to parse a pattern with no lines")]
     EmptyPattern,
 
