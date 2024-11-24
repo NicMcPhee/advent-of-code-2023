@@ -4,7 +4,9 @@
         "Justus",
         "miette",
         "Mizard",
+        "ncols",
         "ndarray",
+        "nrows",
         "repr",
         "struct",
         "thiserror"
