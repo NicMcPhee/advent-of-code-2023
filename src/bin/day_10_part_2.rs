@@ -375,7 +375,7 @@ struct PipeMapIterator<'a> {
     finished: bool,
 }
 
-impl<'a> Iterator for PipeMapIterator<'a> {
+impl Iterator for PipeMapIterator<'_> {
     type Item = Cell;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -404,7 +404,7 @@ impl<'a> Iterator for PipeMapIterator<'a> {
     }
 }
 
-impl<'a> FusedIterator for PipeMapIterator<'a> {}
+impl FusedIterator for PipeMapIterator<'_> {}
 
 fn main() -> miette::Result<()> {
     let input = include_str!("../inputs/day_10.txt");
