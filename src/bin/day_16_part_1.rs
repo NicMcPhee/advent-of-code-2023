@@ -104,6 +104,13 @@ impl CardinalDirection {
             Self::West => Self::North,
         }
     }
+
+    const fn split(self) -> [Self; 2] {
+        match self {
+            Self::East | Self::West => [Self::North, Self::South],
+            Self::North | Self::South => [Self::East, Self::West],
+        }
+    }
 }
 
 type Position = (usize, usize);
@@ -235,27 +242,32 @@ impl Grid {
         match location.tile {
             // If the tile is a mirror (`Slash` or `Backslash`), then rotate the direction of the beam
             // and continue one step in the new direction.
-            Tile::Slash => self
-                .step(position, direction.rotate_slash())
-                .map(|pos| self.shine_beam(pos, direction.rotate_slash())),
-            Tile::Backslash => self
-                .step(position, direction.rotate_backslash())
-                .map(|pos| self.shine_beam(pos, direction.rotate_backslash())),
+            Tile::Slash => self.step_and_shine(position, direction.rotate_slash()),
+            Tile::Backslash => self.step_and_shine(position, direction.rotate_backslash()),
             // If the tile is a splitter (`Dash` or `Pipe`) and we strike it perpendicularly, then the beam
             // splits into two beams, each going perpendicular to the original beam, so we have to call `shine_beam`
             // on each of the new beams.
-            tile @ (Tile::Dash | Tile::Pipe) if tile.perpendicular(direction) => todo!(),
+            tile @ (Tile::Dash | Tile::Pipe) if tile.perpendicular(direction) => {
+                direction
+                    .split()
+                    .into_iter()
+                    .for_each(|new_direction| self.step_and_shine(position, new_direction));
+            }
             // If the tile is `Empty`, or it's `Dash` or `Pipe` but the beam is _not_ traveling in the perpendicular direction,
             // then the beam just passes through this grid location continuing in the same direction.
-            _ => self
-                .step(position, direction)
-                .map(|pos| self.shine_beam(pos, direction)),
+            _ => self.step_and_shine(position, direction),
         };
     }
 
     fn step(&self, position: Position, direction: CardinalDirection) -> Option<Position> {
         let (row, col) = (position + direction)?;
         (row < self.array.nrows() && col < self.array.ncols()).then_some((row, col))
+    }
+
+    fn step_and_shine(&mut self, position: Position, direction: CardinalDirection) {
+        if let Some(pos) = self.step(position, direction) {
+            self.shine_beam(pos, direction);
+        }
     }
 }
 
@@ -274,9 +286,9 @@ impl FromStr for Grid {
 }
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_16_test.txt");
+    let input = include_str!("../inputs/day_16.txt");
     let mut grid = Grid::from_str(input)?;
-    println!("{grid}");
+    // println!("{grid}");
     grid.shine_beam((0, 0), CardinalDirection::East);
     let result = grid.num_energized();
     println!("Result: {result}");
@@ -303,6 +315,6 @@ mod tests {
         let mut grid = Grid::from_str(input).unwrap();
         grid.shine_beam((0, 0), CardinalDirection::East);
         let result = grid.num_energized();
-        assert_eq!(result, 109_755);
+        assert_eq!(result, 7562);
     }
 }
