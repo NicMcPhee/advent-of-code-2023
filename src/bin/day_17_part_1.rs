@@ -19,56 +19,6 @@ enum ParseError {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd)]
-enum Tile {
-    Slash,
-    Backslash,
-    Dash,
-    Pipe,
-    Empty,
-}
-
-impl Tile {
-    const fn perpendicular(self, direction: CardinalDirection) -> bool {
-        matches!(
-            (self, direction),
-            (
-                Self::Dash,
-                CardinalDirection::North | CardinalDirection::South
-            ) | (
-                Self::Pipe,
-                CardinalDirection::East | CardinalDirection::West
-            )
-        )
-    }
-}
-
-impl TryFrom<char> for Tile {
-    type Error = ParseError;
-
-    fn try_from(c: char) -> Result<Self, Self::Error> {
-        Ok(match c {
-            '.' => Self::Empty,
-            '/' => Self::Slash,
-            '\\' => Self::Backslash,
-            '|' => Self::Pipe,
-            '-' => Self::Dash,
-            c => return Err(ParseError::IllegalLocation(c)),
-        })
-    }
-}
-
-impl std::fmt::Display for Tile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Slash => f.write_char('/'),
-            Self::Backslash => f.write_char('\\'),
-            Self::Dash => f.write_char('-'),
-            Self::Pipe => f.write_char('|'),
-            Self::Empty => f.write_char('.'),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum CardinalDirection {
     North,
@@ -147,61 +97,15 @@ impl EnteredFrom {
     }
 }
 
-impl Index<CardinalDirection> for EnteredFrom {
-    type Output = bool;
+    fn left(&self, grid: &Grid) -> Option<(Node, u32)> {
+        todo!()
 
-    fn index(&self, direction: CardinalDirection) -> &Self::Output {
-        match direction {
-            CardinalDirection::North => &self.north,
-            CardinalDirection::South => &self.south,
-            CardinalDirection::East => &self.east,
-            CardinalDirection::West => &self.west,
-        }
+
+    fn right(&self, grid: &Grid) -> Option<(Node, u32)> {
+        todo!()
     }
+
 }
-
-impl IndexMut<CardinalDirection> for EnteredFrom {
-    fn index_mut(&mut self, direction: CardinalDirection) -> &mut Self::Output {
-        match direction {
-            CardinalDirection::North => &mut self.north,
-            CardinalDirection::South => &mut self.south,
-            CardinalDirection::East => &mut self.east,
-            CardinalDirection::West => &mut self.west,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-struct Location {
-    tile: Tile,
-    entered_from: EnteredFrom,
-}
-
-impl Location {
-    pub fn new(tile: Tile) -> Self {
-        Self {
-            tile,
-            entered_from: EnteredFrom::default(),
-        }
-    }
-
-    pub const fn energized(self) -> bool {
-        self.entered_from.any()
-    }
-}
-
-impl TryFrom<char> for Location {
-    type Error = ParseError;
-
-    fn try_from(c: char) -> Result<Self, Self::Error> {
-        Tile::try_from(c).map(Self::new)
-    }
-}
-
-impl Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.tile, f)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -222,78 +126,38 @@ impl Display for Grid {
 }
 
 impl Grid {
-    fn new(num_columns: usize, locations: Vec<Location>) -> Result<Self, ParseError> {
+    fn new(num_columns: usize, locations: Vec<u32>) -> Result<Self, ParseError> {
         debug_assert_eq!(locations.len() % num_columns, 0);
         let num_rows = locations.len() / num_columns;
         let array = Array::from_shape_vec((num_rows, num_columns), locations)?;
         Ok(Self { array })
     }
-
-    fn num_energized(&self) -> usize {
-        self.array.iter().filter(|l| l.energized()).count()
     }
 
-    fn maximize_energized(&self) -> usize {
-        // For each side:
-        //    Loop over all the entry points.
-        //    Clone the grid and call shine_beam
-        //    Get the `num_energized()` from the result grid
-        //    maximize over those
-        let nrows = self.array.nrows();
-        let ncols = self.array.ncols();
-        let mut result = usize::MIN;
-        for row in 0..nrows {
-            result = result.max(self.beam_energized((row, 0), CardinalDirection::East));
-            result = result.max(self.beam_energized((row, ncols - 1), CardinalDirection::West));
-        }
-        for col in 0..ncols {
-            result = result.max(self.beam_energized((0, col), CardinalDirection::South));
-            result = result.max(self.beam_energized((nrows - 1, col), CardinalDirection::North));
-        }
-        result
+
+        let initial_position = (0, 0);
+        let (_, cost) = astar::astar(
+            &Node::new(initial_position),
+            |position| self.successors(position),
+            |position| self.manhattan_distance(position),
+            |position| self.at_goal(position),
+        )?;
+        Some(cost)
+    }
+            .into_iter()
+            .flatten()
     }
 
-    fn beam_energized(&self, position: Position, direction: CardinalDirection) -> usize {
-        let mut grid_clone = self.clone();
-        grid_clone.shine_beam(position, direction);
-        grid_clone.num_energized()
+    fn manhattan_distance(
+        &self,
+        &Node {
+            position: (x, y), ..
+
+    ) -> u32 {
+        (x.abs_diff(self.target.0) + y.abs_diff(self.target.1)) as u32
     }
 
-    fn shine_beam(&mut self, position: Position, direction: CardinalDirection) {
-        let location = &mut self.array[position];
-        if location.entered_from[direction.reverse()] {
-            return;
-        }
-        location.entered_from[direction.reverse()] = true;
-        match location.tile {
-            // If the tile is a mirror (`Slash` or `Backslash`), then rotate the direction of the beam
-            // and continue one step in the new direction.
-            Tile::Slash => self.step_and_shine(position, direction.rotate_slash()),
-            Tile::Backslash => self.step_and_shine(position, direction.rotate_backslash()),
-            // If the tile is a splitter (`Dash` or `Pipe`) and we strike it perpendicularly, then the beam
-            // splits into two beams, each going perpendicular to the original beam, so we have to call `shine_beam`
-            // on each of the new beams.
-            tile @ (Tile::Dash | Tile::Pipe) if tile.perpendicular(direction) => {
-                direction
-                    .split()
-                    .into_iter()
-                    .for_each(|new_direction| self.step_and_shine(position, new_direction));
-            }
-            // If the tile is `Empty`, or it's `Dash` or `Pipe` but the beam is _not_ traveling in the perpendicular direction,
-            // then the beam just passes through this grid location continuing in the same direction.
-            _ => self.step_and_shine(position, direction),
-        };
-    }
-
-    fn step(&self, position: Position, direction: CardinalDirection) -> Option<Position> {
-        let (row, col) = (position + direction)?;
-        (row < self.array.nrows() && col < self.array.ncols()).then_some((row, col))
-    }
-
-    fn step_and_shine(&mut self, position: Position, direction: CardinalDirection) {
-        if let Some(pos) = self.step(position, direction) {
-            self.shine_beam(pos, direction);
-        }
+    fn at_goal(&self, &Node { position, .. }: &Node) -> bool {
     }
 }
 
