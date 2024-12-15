@@ -1,8 +1,10 @@
 use miette::Diagnostic;
 use ndarray::{Array, Array2, ShapeError};
+use pathfinding::directed::astar;
 use std::{
     fmt::{Display, Write},
-    ops::{Add, Index, IndexMut},
+    num::NonZeroU8,
+    ops::Add,
     str::FromStr,
 };
 
@@ -14,12 +16,15 @@ enum ParseError {
     #[error(transparent)]
     ArrayShape(#[from] ShapeError),
 
-    #[error("Illegal location character {0}")]
-    IllegalLocation(char),
+    #[error("An non-digit character {0}")]
+    IllegalChar(char),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Diagnostic, thiserror::Error)]
+#[error("No path was found for this grid")]
+struct NoPathFound;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CardinalDirection {
     North,
     South,
@@ -79,38 +84,43 @@ impl Add<CardinalDirection> for Position {
     }
 }
 
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "This is not a state machine like Clippy thinks"
-)]
-#[derive(Debug, Default, Copy, Clone)]
-struct EnteredFrom {
-    north: bool,
-    south: bool,
-    east: bool,
-    west: bool,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct TravelHistory {
+    direction: CardinalDirection,
+    steps_in_direction: NonZeroU8,
 }
 
-impl EnteredFrom {
-    pub const fn any(self) -> bool {
-        self.north || self.south || self.east || self.west
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct Node {
+    position: Position,
+    travel_history: Option<TravelHistory>,
 }
+
+impl Node {
+    const fn new(position: Position) -> Self {
+        Self {
+            position,
+            travel_history: None,
+        }
+    }
 
     fn left(&self, grid: &Grid) -> Option<(Node, u32)> {
         todo!()
-
+    }
 
     fn right(&self, grid: &Grid) -> Option<(Node, u32)> {
         todo!()
     }
 
-}
+    fn straight(&self, grid: &Grid) -> Option<(Node, u32)> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone)]
 struct Grid {
-    array: Array2<Location>,
+    array: Array2<u32>,
+    target: Position,
 }
 
 impl Display for Grid {
@@ -130,11 +140,11 @@ impl Grid {
         debug_assert_eq!(locations.len() % num_columns, 0);
         let num_rows = locations.len() / num_columns;
         let array = Array::from_shape_vec((num_rows, num_columns), locations)?;
-        Ok(Self { array })
-    }
+        let target = (array.ncols() - 1, array.nrows() - 1);
+        Ok(Self { array, target })
     }
 
-
+    fn minimal_heat_loss(&self) -> Option<u32> {
         let initial_position = (0, 0);
         let (_, cost) = astar::astar(
             &Node::new(initial_position),
@@ -144,20 +154,28 @@ impl Grid {
         )?;
         Some(cost)
     }
+
+    fn successors(&self, node: &Node) -> impl IntoIterator<Item = (Node, u32)> {
+        [node.left(self), node.right(self), node.straight(self)]
             .into_iter()
             .flatten()
     }
 
-    fn manhattan_distance(
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "We know none of this arithmetic will overflow `u32` on the provided inputs"
+    )]
+    const fn manhattan_distance(
         &self,
         &Node {
             position: (x, y), ..
-
+        }: &Node,
     ) -> u32 {
         (x.abs_diff(self.target.0) + y.abs_diff(self.target.1)) as u32
     }
 
     fn at_goal(&self, &Node { position, .. }: &Node) -> bool {
+        position == self.target
     }
 }
 
@@ -166,20 +184,20 @@ impl FromStr for Grid {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let num_columns = s.lines().next().ok_or(ParseError::EmptyPattern)?.len();
-        let locations = s
+        let costs = s
             .lines()
             .flat_map(str::chars)
-            .map(Location::try_from)
-            .collect::<Result<Vec<Location>, _>>()?;
-        Self::new(num_columns, locations)
+            .map(|c| c.to_digit(10).ok_or(ParseError::IllegalChar(c)))
+            .collect::<Result<Vec<u32>, _>>()?;
+        Self::new(num_columns, costs)
     }
 }
 
 fn main() -> miette::Result<()> {
-    let input = include_str!("../inputs/day_16.txt");
+    let input = include_str!("../inputs/day_17_test.txt");
     let grid = Grid::from_str(input)?;
     // println!("{grid}");
-    let result = grid.maximize_energized();
+    let result = grid.minimal_heat_loss().ok_or(NoPathFound)?;
     println!("Result: {result}");
 
     Ok(())
@@ -190,18 +208,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn check_day_16_test_input() {
-        let input = include_str!("../inputs/day_16_test.txt");
+    fn check_day_17_test_input() {
+        let input = include_str!("../inputs/day_17_test.txt");
         let grid = Grid::from_str(input).unwrap();
-        let result = grid.maximize_energized();
-        assert_eq!(result, 51);
+        let result = grid.minimal_heat_loss().unwrap();
+        assert_eq!(result, 102);
     }
 
     #[test]
-    fn check_day_16_full_input() {
-        let input = include_str!("../inputs/day_16.txt");
+    fn check_day_17_full_input() {
+        let input = include_str!("../inputs/day_17.txt");
         let grid = Grid::from_str(input).unwrap();
-        let result = grid.maximize_energized();
+        let result = grid.minimal_heat_loss().unwrap();
         assert_eq!(result, 7793);
     }
 }
